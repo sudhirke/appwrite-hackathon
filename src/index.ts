@@ -27,6 +27,19 @@ const server = serve({
         message: `Hello, ${name}!`,
       });
     },
+
+    "/api/appwrite-config": {
+      GET() {
+        const endpoint = process.env.REACT_APP_APPWRITE_ENDPOINT;
+        const projectId = process.env.REACT_APP_APPWRITE_PROJECT_ID;
+
+        if (!endpoint || !projectId) {
+          return Response.json({ error: "Appwrite is not configured." }, { status: 503 });
+        }
+
+        return Response.json({ endpoint, projectId });
+      },
+    },
   },
 
   development: process.env.NODE_ENV !== "production" && {
