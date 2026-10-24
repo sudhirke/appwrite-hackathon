@@ -32,12 +32,13 @@ const server = serve({
       GET() {
         const endpoint = process.env.REACT_APP_APPWRITE_ENDPOINT;
         const projectId = process.env.REACT_APP_APPWRITE_PROJECT_ID;
+        const databaseId = process.env.REACT_APP_APPWRITE_DATABASE_ID;
 
-        if (!endpoint || !projectId) {
+        if (!endpoint || !projectId || !databaseId) {
           return Response.json({ error: "Appwrite is not configured." }, { status: 503 });
         }
 
-        return Response.json({ endpoint, projectId });
+        return Response.json({ endpoint, projectId, databaseId });
       },
     },
   },
