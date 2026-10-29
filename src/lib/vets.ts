@@ -1,4 +1,5 @@
 import { Client, ID, Permission, Query, Role, TablesDB, type Models } from "appwrite";
+import { getAppwriteConfig } from "./appwrite-config";
 
 export type VetContact = Models.Row & {
   ownerId: string;
@@ -7,16 +8,10 @@ export type VetContact = Models.Row & {
   phone: string;
 };
 
-type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
 let servicePromise: Promise<{ tables: TablesDB; databaseId: string }> | undefined;
 
 async function getService() {
-  servicePromise ??= fetch("/api/appwrite-config")
-    .then(async (response) => {
-      if (!response.ok) throw new Error("The vet contacts database is not configured.");
-      return response.json() as Promise<AppwriteConfig>;
-    })
-    .then(({ endpoint, projectId, databaseId }) => {
+  servicePromise ??= getAppwriteConfig().then(({ endpoint, projectId, databaseId }) => {
       if (!endpoint || !projectId || !databaseId) throw new Error("The vet contacts database is not configured.");
       return { tables: new TablesDB(new Client().setEndpoint(endpoint).setProject(projectId)), databaseId };
     });

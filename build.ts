@@ -16,6 +16,9 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
+    "process.env.REACT_APP_APPWRITE_ENDPOINT": JSON.stringify(process.env.REACT_APP_APPWRITE_ENDPOINT || ""),
+    "process.env.REACT_APP_APPWRITE_PROJECT_ID": JSON.stringify(process.env.REACT_APP_APPWRITE_PROJECT_ID || ""),
+    "process.env.REACT_APP_APPWRITE_DATABASE_ID": JSON.stringify(process.env.REACT_APP_APPWRITE_DATABASE_ID || ""),
   },
 });
 

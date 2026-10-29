@@ -1,5 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, type Models } from "appwrite";
 import type { VetContact } from "./vets";
+import { getAppwriteConfig } from "./appwrite-config";
 
 type PublicFlags = { showName: boolean };
 
@@ -35,18 +36,11 @@ export type NewPet = {
   publicFlags?: PublicFlags;
 };
 
-type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
-
 let servicePromise: Promise<{ tables: TablesDB; storage: Storage; databaseId: string }> | undefined;
 const PET_PHOTOS_BUCKET_ID = "pet-photos";
 
 async function getService() {
-  servicePromise ??= fetch("/api/appwrite-config")
-    .then(async (response) => {
-      if (!response.ok) throw new Error("The pet database is not configured.");
-      return response.json() as Promise<AppwriteConfig>;
-    })
-    .then(({ endpoint, projectId, databaseId }) => {
+  servicePromise ??= getAppwriteConfig().then(({ endpoint, projectId, databaseId }) => {
       if (!endpoint || !projectId || !databaseId) throw new Error("The pet database is not configured.");
       const client = new Client().setEndpoint(endpoint).setProject(projectId);
       return { tables: new TablesDB(client), storage: new Storage(client), databaseId };
