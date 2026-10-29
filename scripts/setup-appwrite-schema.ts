@@ -103,12 +103,15 @@ const definitions = [
     id: "qr_tags",
     name: "QR Tags",
     columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
+      { key: "label", type: "varchar", size: 128, required: true },
+      { key: "color", type: "enum", elements: ["forest", "orange", "blue", "rose", "black"], required: true },
       { key: "qrToken", type: "varchar", size: 255, required: true },
       { key: "qrAssetUrl", type: "url", required: false },
       { key: "isActive", type: "boolean", required: true },
       { key: "issuedAt", type: "datetime", required: true },
     ],
-    indexes: [{ key: "token_unique", type: "unique", attributes: ["qrToken"] }],
+    indexes: [{ key: "token_unique", type: "unique", attributes: ["qrToken"] }, { key: "owner_idx", type: "key", attributes: ["ownerId"] }],
   },
   {
     id: "vaccinations",
@@ -297,8 +300,33 @@ for (const definition of definitions) {
 
 const petColumns = await tables.listColumns({ databaseId, tableId: "pets" });
 if (!petColumns.columns.some((column) => column.key === "photoUrls")) {
-  await tables.createTextColumn({ databaseId, tableId: "pets", key: "photoUrls", required: false });
+  await tables.createTextColumn({
+    databaseId,
+    tableId: "pets",
+    key: "photoUrls",
+    required: false,
+  });
   console.log("created column pets.photoUrls");
+}
+
+const tagColumns = await tables.listColumns({ databaseId, tableId: "qr_tags" });
+if (!tagColumns.columns.some((column) => column.key === "ownerId")) {
+  await tables.createVarcharColumn({ databaseId, tableId: "qr_tags", key: "ownerId", size: 36, required: false });
+  console.log("created column qr_tags.ownerId");
+}
+if (!tagColumns.columns.some((column) => column.key === "label")) {
+  await tables.createVarcharColumn({ databaseId, tableId: "qr_tags", key: "label", size: 128, required: false });
+  console.log("created column qr_tags.label");
+}
+if (!tagColumns.columns.some((column) => column.key === "color")) {
+  await tables.createEnumColumn({ databaseId, tableId: "qr_tags", key: "color", elements: ["forest", "orange", "blue", "rose", "black"], required: false });
+  console.log("created column qr_tags.color");
+}
+
+const tagIndexes = await tables.listIndexes({ databaseId, tableId: "qr_tags" });
+if (!tagIndexes.indexes.some((index) => index.key === "owner_idx")) {
+  await tables.createIndex({ databaseId, tableId: "qr_tags", key: "owner_idx", type: TablesDBIndexType.Key, columns: ["ownerId"] });
+  console.log("created index qr_tags.owner_idx");
 }
 
 for (const relationship of relationships) {

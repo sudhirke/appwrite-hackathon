@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, Heart, LogOut, MapPin, PawPrint, Pencil, Phone, Plus, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
+import { QRCodeImage } from "./QRCodeImage";
+import { assignTag, createTag, deleteTag, listTags, setTagActive, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
 
@@ -23,6 +25,11 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [isAddingVet, setIsAddingVet] = useState(false);
   const [isSavingVet, setIsSavingVet] = useState(false);
   const [vetError, setVetError] = useState("");
+  const [tags, setTags] = useState<QRTag[]>([]);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<QRTag | null>(null);
+  const [tagError, setTagError] = useState("");
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
 
   useEffect(() => {
@@ -30,6 +37,10 @@ export function Home({ user, onSignOut }: HomeProps) {
       .then(setPets)
       .catch((error) => setPetError(error instanceof Error ? error.message : "Could not load your pets."))
       .finally(() => setIsLoadingPets(false));
+  }, [user.$id]);
+
+  useEffect(() => {
+    listTags(user.$id).then(setTags).catch((error) => setTagError(error instanceof Error ? error.message : "Could not load QR tags."));
   }, [user.$id]);
 
   useEffect(() => {
@@ -180,6 +191,48 @@ export function Home({ user, onSignOut }: HomeProps) {
     }
   }
 
+  async function purchaseTag(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setIsSavingTag(true);
+    setTagError("");
+    try {
+      const created = await createTag(user.$id, String(data.get("label")).trim(), String(data.get("color")) as TagColor);
+      setTags((current) => [created, ...current]);
+      setIsAddingTag(false);
+      form.reset();
+    } catch (error) { setTagError(error instanceof Error ? error.message : "Could not create the QR tag."); }
+    finally { setIsSavingTag(false); }
+  }
+
+  async function changeTagPet(tag: QRTag, petId: string) {
+    setTagError("");
+    try {
+      await assignTag(tag.$id, petId || null);
+      const pet = pets.find((item) => item.$id === petId) ?? null;
+      setTags((current) => current.map((item) => item.$id === tag.$id ? { ...item, petId: pet } : item));
+      setSelectedTag((current) => current?.$id === tag.$id ? { ...current, petId: pet } : current);
+    } catch (error) { setTagError(error instanceof Error ? error.message : "Could not assign this tag."); }
+  }
+
+  async function toggleTag(tag: QRTag) {
+    try {
+      const updated = await setTagActive(tag.$id, !tag.isActive);
+      setTags((current) => current.map((item) => item.$id === tag.$id ? { ...item, ...updated } : item));
+      setSelectedTag((current) => current?.$id === tag.$id ? { ...current, ...updated } : current);
+    } catch (error) { setTagError(error instanceof Error ? error.message : "Could not update this tag."); }
+  }
+
+  async function removeTag(id: string) {
+    try { await deleteTag(id); setTags((current) => current.filter((tag) => tag.$id !== id)); setSelectedTag(null); }
+    catch (error) { setTagError(error instanceof Error ? error.message : "Could not remove this tag."); }
+  }
+
+  function getTagPet(tag: QRTag) { return typeof tag.petId === "string" ? pets.find((pet) => pet.$id === tag.petId) : tag.petId; }
+  function getTagPetId(tag: QRTag) { return typeof tag.petId === "string" ? tag.petId : tag.petId?.$id ?? ""; }
+  function getPublicTagUrl(tag: QRTag) { return `${window.location.origin}/p/${tag.qrToken}`; }
+
   function getVetId(pet: Pet) {
     return typeof pet.vetContactId === "string" ? pet.vetContactId : pet.vetContactId?.$id ?? "";
   }
@@ -237,6 +290,12 @@ export function Home({ user, onSignOut }: HomeProps) {
         </div>
       </main>
     );
+  }
+
+  if (selectedTag) {
+    const pet = getTagPet(selectedTag);
+    const publicUrl = getPublicTagUrl(selectedTag);
+    return <main className="home-page"><nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav><div className="tag-details-page"><section className={`tag-hero tag-${selectedTag.color}`}><div className="tag-qr"><QRCodeImage value={publicUrl} label={selectedTag.label} /></div><div><p className="eyebrow">Smart QR tag</p><h1>{selectedTag.label}</h1><p>{pet ? `Linked to ${pet.name}` : "Not assigned to a pet"}</p><span className={`tag-state ${selectedTag.isActive ? "active" : "inactive"}`}>{selectedTag.isActive ? "Active" : "Paused"}</span></div></section><section className="tag-details-grid"><div className="pet-info-card"><h2>Tag settings</h2><div className="field-group"><Label htmlFor="tag-pet">Assigned pet</Label><select id="tag-pet" value={getTagPetId(selectedTag)} onChange={(event) => changeTagPet(selectedTag, event.target.value)}><option value="">Not assigned</option>{pets.map((item) => <option key={item.$id} value={item.$id}>{item.name}</option>)}</select></div><dl><div><dt>Color</dt><dd className="capitalize">{selectedTag.color}</dd></div><div><dt>Issued</dt><dd>{new Date(selectedTag.issuedAt).toLocaleString()}</dd></div><div><dt>Tag ID</dt><dd>{selectedTag.$id}</dd></div></dl><div className="tag-setting-actions"><Button variant="outline" onClick={() => toggleTag(selectedTag)}>{selectedTag.isActive ? "Pause tag" : "Activate tag"}</Button><Button variant="destructive" onClick={() => removeTag(selectedTag.$id)}>Delete tag</Button></div></div><div className="pet-info-card"><h2>Public profile link</h2><p className="tag-help">This is the URL encoded in the QR. It works without signing in while the tag is active and assigned.</p><a className="public-profile-link" href={publicUrl} target="_blank" rel="noreferrer"><span>{publicUrl}</span><ExternalLink /></a>{pet && <button className="tag-linked-pet" onClick={() => { setSelectedTag(null); setSelectedPet(pet); }}><span>View {pet.name}’s full profile</span><ChevronRight /></button>}</div></section></div></main>;
   }
 
   return (
@@ -301,6 +360,12 @@ export function Home({ user, onSignOut }: HomeProps) {
             </div>
           </section>
         )}
+
+        {tagError && <p className="home-error" role="alert">{tagError}</p>}
+        <section className="home-section tag-section">
+          <div className="section-heading"><div><p className="eyebrow">Smart identification</p><h2>Your QR tags</h2></div><Button variant="outline" size="sm" onClick={() => setIsAddingTag(true)}><ShoppingBag /> Get a tag</Button></div>
+          {tags.length ? <div className="tag-grid">{tags.map((tag) => { const pet = getTagPet(tag); return <article className={`tag-card tag-${tag.color}`} key={tag.$id} onClick={() => setSelectedTag(tag)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedTag(tag); }}><span className="tag-card-icon"><QrCode /></span><div><h3>{tag.label}</h3><p>{pet ? `Linked to ${pet.name}` : "Ready to assign"}</p><span className={`tag-state ${tag.isActive ? "active" : "inactive"}`}>{tag.isActive ? "Active" : "Paused"}</span></div><ChevronRight /></article>; })}</div> : <div className="tag-empty"><QrCode /><div><h3>No QR tags yet</h3><p>Add a colored smart tag and link it to one of your pets.</p></div><Button onClick={() => setIsAddingTag(true)}>Get your first tag</Button></div>}
+        </section>
 
         <section className="home-section">
           <div className="section-heading"><div><p className="eyebrow">At a glance</p><h2>Your pet space</h2></div><button>View all <ChevronRight /></button></div>
@@ -379,6 +444,8 @@ export function Home({ user, onSignOut }: HomeProps) {
           </section>
         </div>
       )}
+
+      {isAddingTag && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsAddingTag(false); }}><section className="pet-modal" role="dialog" aria-modal="true" aria-labelledby="add-tag-title"><button className="modal-close" onClick={() => setIsAddingTag(false)} aria-label="Close"><X /></button><span className="modal-icon"><QrCode /></span><p className="eyebrow">Smart identification</p><h2 id="add-tag-title">Get a QR pet tag</h2><p>Choose a color and name. A unique, secure QR code is generated automatically.</p><form onSubmit={purchaseTag}><div className="field-group"><Label htmlFor="tagLabel">Tag name</Label><Input id="tagLabel" name="label" placeholder="Milo’s collar tag" maxLength={128} required autoFocus /></div><fieldset className="tag-color-picker"><legend>Tag color</legend>{TAG_COLORS.map((color) => <label key={color}><input type="radio" name="color" value={color} defaultChecked={color === "forest"} /><span className={`tag-color tag-${color}`} aria-hidden="true" /><span>{color}</span></label>)}</fieldset>{tagError && <p className="form-message" role="alert">{tagError}</p>}<div className="modal-actions"><Button type="button" variant="outline" onClick={() => setIsAddingTag(false)} disabled={isSavingTag}>Cancel</Button><Button type="submit" className="save-pet-button" disabled={isSavingTag}>{isSavingTag ? "Creating…" : "Create tag"}</Button></div></form></section></div>}
     </main>
   );
 }
