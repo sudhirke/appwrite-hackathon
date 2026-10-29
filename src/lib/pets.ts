@@ -1,4 +1,5 @@
 import { Client, ID, Permission, Query, Role, TablesDB, type Models } from "appwrite";
+import type { VetContact } from "./vets";
 
 type PublicFlags = { showName: boolean };
 
@@ -14,6 +15,7 @@ type PetFields = {
   lastKnownLocation?: [number, number];
   lastSeenAt?: string;
   publicFlags?: string;
+  vetContactId?: VetContact | string | null;
 };
 
 export type Pet = Models.Row & PetFields;
@@ -53,7 +55,7 @@ export async function listPets(ownerId: string) {
   const result = await tables.listRows<Pet>({
     databaseId,
     tableId: "pets",
-    queries: [Query.equal("ownerId", ownerId), Query.orderDesc("$createdAt")],
+    queries: [Query.equal("ownerId", ownerId), Query.orderDesc("$createdAt"), Query.select(["*", "vetContactId.*"])],
   });
   return result.rows;
 }
@@ -87,4 +89,14 @@ export async function createPet(ownerId: string, pet: NewPet) {
 export async function deletePet(rowId: string) {
   const { tables, databaseId } = await getService();
   await tables.deleteRow({ databaseId, tableId: "pets", rowId });
+}
+
+export async function updatePetVetContact(rowId: string, vetContactId: string | null) {
+  const { tables, databaseId } = await getService();
+  return tables.updateRow<Pet>({
+    databaseId,
+    tableId: "pets",
+    rowId,
+    data: { vetContactId },
+  });
 }

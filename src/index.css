@@ -93,6 +93,9 @@
 .welcome-banner p:last-child { margin: 1rem 0 0; color: rgb(255 255 255 / .7); }
 .add-pet-button { position: relative; z-index: 2; flex: none; height: 3rem; color: #315c4b; border-radius: .8rem; background: #fff8e8; }
 .add-pet-button:hover { background: #fff; }
+.banner-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .7rem; }
+.add-vet-button { height: 3rem; color: #fff; border: 1px solid rgb(255 255 255 / .3); border-radius: .8rem; background: rgb(255 255 255 / .08); }
+.add-vet-button:hover { background: rgb(255 255 255 / .16); }
 .banner-paw { position: absolute; right: 15rem; bottom: -3.5rem; width: 10rem; height: 10rem; opacity: .045; transform: rotate(-18deg); }
 .home-section { margin-top: clamp(2.5rem, 5vw, 4rem); }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.4rem; }
@@ -124,8 +127,11 @@
 .pet-avatar { display: grid; place-items: center; flex: none; width: 2.8rem; height: 2.8rem; color: #315c4b; border-radius: .85rem; background: #dce8df; }
 .pet-avatar svg { width: 1.2rem; }
 .pet-card div { min-width: 0; }
+.pet-card-copy { flex: 1; }
 .pet-card h3 { margin: 0; overflow: hidden; font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .pet-card p { margin: .25rem 0 0; overflow: hidden; color: #88857c; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.pet-card-copy label { display: flex; align-items: center; gap: .4rem; margin-top: .55rem; color: #77746c; font-size: .68rem; }
+.pet-card-copy select { min-width: 0; max-width: 9rem; height: 1.8rem; padding: 0 .4rem; color: #315c4b; border: 1px solid #dad7ce; border-radius: .45rem; background: #fff; font-size: .67rem; }
 .pet-card > button { display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; margin-left: auto; padding: 0; color: #9b776b; border: 0; border-radius: .5rem; background: transparent; cursor: pointer; }
 .pet-card > button:hover { color: #a03d2a; background: #faece8; }
 .pet-card > button svg { width: .95rem; }
@@ -135,12 +141,27 @@
 .pet-status.missing { color: #9a3d27; background: #fae0d8; }
 .home-error { margin: 1rem 0 0; padding: .8rem 1rem; color: #923b29; border: 1px solid #efc7bc; border-radius: .8rem; background: #fff0ec; font-size: .82rem; }
 .pets-loading { margin: 1.25rem 0 0; color: #7d7a71; font-size: .85rem; }
+.vet-section { margin-top: 2rem; }
+.vet-section .section-heading > button { border: 1px solid #d7d4cb; background: #fffdf8; }
+.vet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.vet-card { display: flex; align-items: flex-start; gap: .85rem; padding: 1.1rem; border: 1px solid #e1ded4; border-radius: 1rem; background: #fffdf8; }
+.vet-avatar { display: grid; place-items: center; flex: none; width: 2.7rem; height: 2.7rem; color: #9a5d2e; border-radius: .8rem; background: #f3dfcc; }
+.vet-avatar svg { width: 1.15rem; }
+.vet-card > div { min-width: 0; }
+.vet-card h3 { margin: .1rem 0 0; overflow: hidden; font-family: Georgia, "Times New Roman", serif; font-size: 1.05rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.vet-card p { margin: .25rem 0 .55rem; overflow: hidden; color: #858278; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.vet-card a { display: inline-flex; align-items: center; gap: .3rem; color: #315c4b; font-size: .7rem; font-weight: 700; text-decoration: none; }
+.vet-card a svg { width: .8rem; }
+.vet-card > button { display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; margin-left: auto; padding: 0; color: #9b776b; border: 0; border-radius: .5rem; background: transparent; cursor: pointer; }
+.vet-card > button:hover { color: #a03d2a; background: #faece8; }
+.vet-card > button svg { width: .95rem; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1.25rem; background: rgb(25 34 29 / .55); backdrop-filter: blur(5px); }
 .pet-modal { position: relative; width: min(100%, 34rem); max-height: calc(100vh - 2.5rem); overflow-y: auto; padding: 2rem; border-radius: 1.4rem; background: #fffdf8; box-shadow: 0 2rem 5rem rgb(20 30 25 / .25); }
 .modal-close { position: absolute; top: 1rem; right: 1rem; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; padding: 0; color: #747269; border: 0; border-radius: 50%; background: #f0eee7; cursor: pointer; }
 .modal-close svg { width: 1rem; }
 .modal-icon { display: grid; place-items: center; width: 3rem; height: 3rem; margin-bottom: 1.2rem; color: #315c4b; border-radius: .9rem; background: #dce8df; transform: rotate(-4deg); }
 .modal-icon svg { width: 1.3rem; }
+.vet-modal-icon { color: #9a5d2e; background: #f3dfcc; }
 .pet-modal .eyebrow { margin-bottom: .4rem; }
 .pet-modal h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 2rem; font-weight: 500; letter-spacing: -.04em; }
 .pet-modal > p:not(.eyebrow) { margin: .6rem 0 1.6rem; color: #77746c; font-size: .85rem; }
@@ -163,8 +184,10 @@
   .home-brand > span:last-child, .user-chip div, .signout-button { display: none; }
   .feature-grid { grid-template-columns: 1fr; }
   .pet-grid { grid-template-columns: 1fr; }
+  .vet-grid { grid-template-columns: 1fr; }
   .feature-card { min-height: 12rem; }
   .welcome-banner { align-items: flex-start; flex-direction: column; border-radius: 1.4rem; }
+  .banner-actions { width: 100%; justify-content: flex-start; }
   .banner-paw { right: -2rem; }
   .tip-card { align-items: flex-start; }
   .pet-form-row { grid-template-columns: 1fr; }

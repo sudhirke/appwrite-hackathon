@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bell, Bone, CalendarDays, ChevronRight, Heart, LogOut, PawPrint, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Bell, Bone, CalendarDays, ChevronRight, Heart, LogOut, PawPrint, Phone, Plus, Sparkles, Stethoscope, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { AuthUser } from "./lib/auth";
-import { createPet, deletePet, listPets, type NewPet, type Pet } from "./lib/pets";
+import { createPet, deletePet, listPets, updatePetVetContact, type NewPet, type Pet } from "./lib/pets";
+import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
 
@@ -15,6 +16,10 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [isLoadingPets, setIsLoadingPets] = useState(true);
   const [pets, setPets] = useState<Pet[]>([]);
   const [petError, setPetError] = useState("");
+  const [vetContacts, setVetContacts] = useState<VetContact[]>([]);
+  const [isAddingVet, setIsAddingVet] = useState(false);
+  const [isSavingVet, setIsSavingVet] = useState(false);
+  const [vetError, setVetError] = useState("");
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
 
   useEffect(() => {
@@ -22,6 +27,12 @@ export function Home({ user, onSignOut }: HomeProps) {
       .then(setPets)
       .catch((error) => setPetError(error instanceof Error ? error.message : "Could not load your pets."))
       .finally(() => setIsLoadingPets(false));
+  }, [user.$id]);
+
+  useEffect(() => {
+    listVetContacts(user.$id)
+      .then(setVetContacts)
+      .catch((error) => setVetError(error instanceof Error ? error.message : "Could not load vet contacts."));
   }, [user.$id]);
 
   async function handleSignOut() {
@@ -74,6 +85,54 @@ export function Home({ user, onSignOut }: HomeProps) {
     }
   }
 
+  async function addVetContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setIsSavingVet(true);
+    setVetError("");
+    try {
+      const created = await createVetContact(user.$id, {
+        name: String(data.get("vetName")),
+        clinic: String(data.get("clinic")),
+        phone: String(data.get("phone")),
+      });
+      setVetContacts((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setIsAddingVet(false);
+      form.reset();
+    } catch (error) {
+      setVetError(error instanceof Error ? error.message : "Could not save the vet contact.");
+    } finally {
+      setIsSavingVet(false);
+    }
+  }
+
+  async function removeVetContact(id: string) {
+    setVetError("");
+    try {
+      await deleteVetContact(id);
+      setVetContacts((current) => current.filter((contact) => contact.$id !== id));
+      setPets((current) => current.map((pet) => getVetId(pet) === id ? { ...pet, vetContactId: null } : pet));
+    } catch (error) {
+      setVetError(error instanceof Error ? error.message : "Could not remove the vet contact.");
+    }
+  }
+
+  async function assignVet(petId: string, vetId: string) {
+    setVetError("");
+    try {
+      await updatePetVetContact(petId, vetId || null);
+      const contact = vetContacts.find((vet) => vet.$id === vetId) ?? null;
+      setPets((current) => current.map((pet) => pet.$id === petId ? { ...pet, vetContactId: contact } : pet));
+    } catch (error) {
+      setVetError(error instanceof Error ? error.message : "Could not update the pet’s vet contact.");
+    }
+  }
+
+  function getVetId(pet: Pet) {
+    return typeof pet.vetContactId === "string" ? pet.vetContactId : pet.vetContactId?.$id ?? "";
+  }
+
   return (
     <main className="home-page">
       <nav className="home-nav">
@@ -96,7 +155,10 @@ export function Home({ user, onSignOut }: HomeProps) {
             <h1>Good to see you, {firstName}.</h1>
             <p>Everything your pets need, lovingly kept in one place.</p>
           </div>
-          <Button className="add-pet-button" onClick={() => setIsAddingPet(true)}><Plus /> Add a pet</Button>
+          <div className="banner-actions">
+            <Button className="add-vet-button" onClick={() => setIsAddingVet(true)}><Stethoscope /> Add vet contact</Button>
+            <Button className="add-pet-button" onClick={() => setIsAddingPet(true)}><Plus /> Add a pet</Button>
+          </div>
           <PawPrint className="banner-paw" aria-hidden="true" />
         </section>
 
@@ -109,9 +171,25 @@ export function Home({ user, onSignOut }: HomeProps) {
               {pets.map((pet) => (
                 <article className="pet-card" key={pet.$id}>
                   {pet.photoUrl ? <img className="pet-avatar pet-photo" src={pet.photoUrl} alt="" /> : <span className="pet-avatar"><PawPrint /></span>}
-                  <div><h3>{pet.name}</h3><p>{[pet.breed, pet.color].filter(Boolean).join(" · ") || "Pet profile"}{pet.birthDate && ` · Born ${new Date(pet.birthDate).toLocaleDateString(undefined, { month: "short", year: "numeric" })}`}</p></div>
+                  <div className="pet-card-copy"><h3>{pet.name}</h3><p>{[pet.breed, pet.color].filter(Boolean).join(" · ") || "Pet profile"}{pet.birthDate && ` · Born ${new Date(pet.birthDate).toLocaleDateString(undefined, { month: "short", year: "numeric" })}`}</p><label><span>Vet</span><select value={getVetId(pet)} onChange={(event) => assignVet(pet.$id, event.target.value)}><option value="">Not assigned</option>{vetContacts.map((vet) => <option key={vet.$id} value={vet.$id}>{vet.name}{vet.clinic ? ` · ${vet.clinic}` : ""}</option>)}</select></label></div>
                   <span className={`pet-status ${pet.status}`}>{pet.status}</span>
                   <button onClick={() => removePet(pet.$id)} aria-label={`Remove ${pet.name}`}><Trash2 /></button>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {vetError && <p className="home-error" role="alert">{vetError}</p>}
+        {vetContacts.length > 0 && (
+          <section className="home-section vet-section">
+            <div className="section-heading"><div><p className="eyebrow">Trusted care</p><h2>Vet contacts</h2></div><Button variant="outline" size="sm" onClick={() => setIsAddingVet(true)}><Plus /> Add contact</Button></div>
+            <div className="vet-grid">
+              {vetContacts.map((vet) => (
+                <article className="vet-card" key={vet.$id}>
+                  <span className="vet-avatar"><Stethoscope /></span>
+                  <div><h3>{vet.name}</h3><p>{vet.clinic || "Veterinary contact"}</p><a href={`tel:${vet.phone}`}><Phone /> {vet.phone}</a></div>
+                  <button onClick={() => removeVetContact(vet.$id)} aria-label={`Remove ${vet.name}`}><Trash2 /></button>
                 </article>
               ))}
             </div>
@@ -150,6 +228,25 @@ export function Home({ user, onSignOut }: HomeProps) {
               <label className="remember-me"><input type="checkbox" name="showName" defaultChecked /><span>Show name on the public QR profile</span></label>
               {petError && <p className="form-message" role="alert">{petError}</p>}
               <div className="modal-actions"><Button type="button" variant="outline" onClick={() => setIsAddingPet(false)} disabled={isSavingPet}>Cancel</Button><Button type="submit" className="save-pet-button" disabled={isSavingPet}>{isSavingPet ? "Saving…" : "Add pet"}</Button></div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {isAddingVet && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsAddingVet(false); }}>
+          <section className="pet-modal vet-modal" role="dialog" aria-modal="true" aria-labelledby="add-vet-title">
+            <button className="modal-close" onClick={() => setIsAddingVet(false)} aria-label="Close"><X /></button>
+            <span className="modal-icon vet-modal-icon"><Stethoscope /></span>
+            <p className="eyebrow">Trusted care</p>
+            <h2 id="add-vet-title">Add a vet contact</h2>
+            <p>Save their details, then assign them to any of your pets.</p>
+            <form onSubmit={addVetContact}>
+              <div className="field-group"><Label htmlFor="vetName">Vet’s name</Label><Input id="vetName" name="vetName" placeholder="Dr. Maya Patel" maxLength={128} required autoFocus /></div>
+              <div className="field-group"><Label htmlFor="clinic">Clinic <span className="optional">(optional)</span></Label><Input id="clinic" name="clinic" placeholder="Happy Paws Veterinary Clinic" maxLength={255} /></div>
+              <div className="field-group"><Label htmlFor="phone">Phone number</Label><Input id="phone" name="phone" type="tel" placeholder="+91 98765 43210" maxLength={32} required /></div>
+              {vetError && <p className="form-message" role="alert">{vetError}</p>}
+              <div className="modal-actions"><Button type="button" variant="outline" onClick={() => setIsAddingVet(false)} disabled={isSavingVet}>Cancel</Button><Button type="submit" className="save-pet-button" disabled={isSavingVet}>{isSavingVet ? "Saving…" : "Add contact"}</Button></div>
             </form>
           </section>
         </div>
