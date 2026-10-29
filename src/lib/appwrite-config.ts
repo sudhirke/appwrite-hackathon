@@ -1,10 +1,8 @@
 export type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
 
-const embeddedConfig: Partial<AppwriteConfig> = {
-  endpoint: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_ENDPOINT || "" : "",
-  projectId: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_PROJECT_ID || "" : "",
-  databaseId: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_DATABASE_ID || "" : "",
-};
+declare const __APPWRITE_CONFIG__: Partial<AppwriteConfig> | undefined;
+
+const embeddedConfig: Partial<AppwriteConfig> = typeof __APPWRITE_CONFIG__ !== "undefined" ? __APPWRITE_CONFIG__ : {};
 
 let configPromise: Promise<AppwriteConfig> | undefined;
 const complete = (config: Partial<AppwriteConfig>): config is AppwriteConfig => Boolean(config.endpoint && config.projectId && config.databaseId);
@@ -25,7 +23,7 @@ async function loadConfig(): Promise<AppwriteConfig> {
   const body = await response.text();
   if (!response.ok || !contentType.includes("application/json")) {
     console.error("[Appwrite config] Invalid configuration response.", { url: response.url, status: response.status, statusText: response.statusText, contentType, bodyPreview: body.slice(0, 160), host: window.location.host });
-    throw new Error("Appwrite configuration is unavailable. Set REACT_APP_APPWRITE_ENDPOINT, REACT_APP_APPWRITE_PROJECT_ID, and REACT_APP_APPWRITE_DATABASE_ID in the Appwrite Site build variables, then redeploy.");
+    throw new Error("Appwrite configuration is unavailable. Ensure REACT_APP_APPWRITE_DATABASE_ID is available during the Appwrite Site build, then redeploy.");
   }
   try {
     const config = JSON.parse(body) as Partial<AppwriteConfig>;
