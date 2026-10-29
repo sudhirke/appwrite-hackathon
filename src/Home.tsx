@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, Map as MapIcon, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 import { QRCodeImage } from "./QRCodeImage";
 import { TagLocationMap } from "./TagLocationMap";
+import { TagsOverviewMap } from "./TagsOverviewMap";
 import { assignTag, createTag, deleteTag, listTags, setTagActive, updateTagLocation, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
@@ -32,6 +33,7 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [selectedTag, setSelectedTag] = useState<QRTag | null>(null);
   const [tagError, setTagError] = useState("");
   const [isSavingTagLocation, setIsSavingTagLocation] = useState(false);
+  const [isMapView, setIsMapView] = useState(false);
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
 
   useEffect(() => {
@@ -50,6 +52,10 @@ export function Home({ user, onSignOut }: HomeProps) {
       .then(setVetContacts)
       .catch((error) => setVetError(error instanceof Error ? error.message : "Could not load vet contacts."));
   }, [user.$id]);
+
+  useEffect(() => {
+    document.title = isMapView ? "Locate your furry babies · Pets Heaven" : "Pets Heaven";
+  }, [isMapView]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -279,6 +285,24 @@ export function Home({ user, onSignOut }: HomeProps) {
     return pet.photoUrl ? [pet.photoUrl] : [];
   }
 
+  if (isMapView) {
+    const locatedTags = tags.filter((tag) => tag.location);
+    const missingTags = locatedTags.filter((tag) => getTagPet(tag)?.status === "missing");
+    return (
+      <main className="home-page map-view-page">
+        <nav className="home-nav"><button className="details-back" onClick={() => setIsMapView(false)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <div className="map-view-content">
+          <header className="map-view-header"><div><p className="eyebrow">Location overview</p><h1>Locate your furry babies</h1><p>See every located QR tag and the pet connected to it.</p></div><div className="map-view-stats"><span><strong>{locatedTags.length}</strong> located</span><span className={missingTags.length ? "alert" : ""}><strong>{missingTags.length}</strong> missing</span></div></header>
+          <section className="map-view-panel">
+            <TagsOverviewMap tags={tags} pets={pets} owner={user} onSelectTag={(tag) => { setIsMapView(false); setSelectedTag(tag); }} />
+            {!locatedTags.length && <div className="map-view-empty"><MapPin /><h2>No tag locations yet</h2><p>Open a QR tag and set its location to make it appear here.</p></div>}
+            <div className="map-view-legend"><span><i className="legend-photo" /> Located pet</span><span><i className="legend-missing">⚑</i> Missing pet</span></div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   if (selectedPet) {
     const photos = getPetPhotos(selectedPet);
     const vet = typeof selectedPet.vetContactId === "string" ? vetContacts.find((item) => item.$id === selectedPet.vetContactId) : selectedPet.vetContactId;
@@ -369,6 +393,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             <p>Everything your pets need, lovingly kept in one place.</p>
           </div>
           <div className="banner-actions">
+            <Button variant="outline" className="map-view-button" onClick={() => setIsMapView(true)}><MapIcon /> Map view</Button>
             <Button className="add-vet-button" onClick={() => setIsAddingVet(true)}><Stethoscope /> Add vet contact</Button>
             <Button className="add-pet-button" onClick={() => setIsAddingPet(true)}><Plus /> Add a pet</Button>
           </div>
