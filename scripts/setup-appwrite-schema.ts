@@ -110,6 +110,7 @@ const definitions = [
       { key: "qrAssetUrl", type: "url", required: false },
       { key: "isActive", type: "boolean", required: true },
       { key: "issuedAt", type: "datetime", required: true },
+      { key: "location", type: "point", required: false },
     ],
     indexes: [{ key: "token_unique", type: "unique", attributes: ["qrToken"] }, { key: "owner_idx", type: "key", attributes: ["ownerId"] }],
   },
@@ -321,6 +322,10 @@ if (!tagColumns.columns.some((column) => column.key === "label")) {
 if (!tagColumns.columns.some((column) => column.key === "color")) {
   await tables.createEnumColumn({ databaseId, tableId: "qr_tags", key: "color", elements: ["forest", "orange", "blue", "rose", "black"], required: false });
   console.log("created column qr_tags.color");
+}
+if (!tagColumns.columns.some((column) => column.key === "location")) {
+  await tables.createPointColumn({ databaseId, tableId: "qr_tags", key: "location", required: false });
+  console.log("created column qr_tags.location");
 }
 
 const tagIndexes = await tables.listIndexes({ databaseId, tableId: "qr_tags" });

@@ -12,6 +12,7 @@ export type QRTag = Models.Row & {
   qrToken: string;
   isActive: boolean;
   issuedAt: string;
+  location?: [number, number] | null;
   petId?: Pet | string | null;
 };
 
@@ -62,6 +63,13 @@ export async function assignTag(rowId: string, petId: string | null) {
 export async function setTagActive(rowId: string, isActive: boolean) {
   const { tables, databaseId } = await getService();
   return tables.updateRow<QRTag>({ databaseId, tableId: "qr_tags", rowId, data: { isActive } });
+}
+
+export async function updateTagLocation(rowId: string, latitude: number, longitude: number) {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error("Latitude must be between -90 and 90.");
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error("Longitude must be between -180 and 180.");
+  const { tables, databaseId } = await getService();
+  return tables.updateRow<QRTag>({ databaseId, tableId: "qr_tags", rowId, data: { location: [longitude, latitude] } });
 }
 
 export async function deleteTag(rowId: string) {

@@ -1,13 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, Map as MapIcon, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 import { QRCodeImage } from "./QRCodeImage";
-import { assignTag, createTag, deleteTag, listTags, setTagActive, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
+import { TagLocationMap } from "./TagLocationMap";
+import { TagsOverviewMap } from "./TagsOverviewMap";
+import { assignTag, createTag, deleteTag, listTags, setTagActive, updateTagLocation, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
 
@@ -30,6 +32,8 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [selectedTag, setSelectedTag] = useState<QRTag | null>(null);
   const [tagError, setTagError] = useState("");
+  const [isSavingTagLocation, setIsSavingTagLocation] = useState(false);
+  const [isMapView, setIsMapView] = useState(false);
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
 
   useEffect(() => {
@@ -48,6 +52,10 @@ export function Home({ user, onSignOut }: HomeProps) {
       .then(setVetContacts)
       .catch((error) => setVetError(error instanceof Error ? error.message : "Could not load vet contacts."));
   }, [user.$id]);
+
+  useEffect(() => {
+    document.title = isMapView ? "Locate your furry babies · Pets Heaven" : "Pets Heaven";
+  }, [isMapView]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -224,6 +232,31 @@ export function Home({ user, onSignOut }: HomeProps) {
     } catch (error) { setTagError(error instanceof Error ? error.message : "Could not update this tag."); }
   }
 
+  async function saveTagLocation(tag: QRTag, latitude: number, longitude: number) {
+    setIsSavingTagLocation(true);
+    setTagError("");
+    try {
+      const updated = await updateTagLocation(tag.$id, latitude, longitude);
+      setTags((current) => current.map((item) => item.$id === tag.$id ? { ...item, ...updated } : item));
+      setSelectedTag((current) => current?.$id === tag.$id ? { ...current, ...updated } : current);
+    } catch (error) { setTagError(error instanceof Error ? error.message : "Could not update the tag location."); }
+    finally { setIsSavingTagLocation(false); }
+  }
+
+  function useCurrentTagLocation(tag: QRTag) {
+    setTagError("");
+    if (!navigator.geolocation) {
+      setTagError("Location services are not supported by this browser.");
+      return;
+    }
+    setIsSavingTagLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => void saveTagLocation(tag, coords.latitude, coords.longitude),
+      (error) => { setIsSavingTagLocation(false); setTagError(error.message || "Could not get your current location."); },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
   async function removeTag(id: string) {
     try { await deleteTag(id); setTags((current) => current.filter((tag) => tag.$id !== id)); setSelectedTag(null); }
     catch (error) { setTagError(error instanceof Error ? error.message : "Could not remove this tag."); }
@@ -250,6 +283,24 @@ export function Home({ user, onSignOut }: HomeProps) {
       } catch { /* Fall back to the legacy profile photo. */ }
     }
     return pet.photoUrl ? [pet.photoUrl] : [];
+  }
+
+  if (isMapView) {
+    const locatedTags = tags.filter((tag) => tag.location);
+    const missingTags = locatedTags.filter((tag) => getTagPet(tag)?.status === "missing");
+    return (
+      <main className="home-page map-view-page">
+        <nav className="home-nav"><button className="details-back" onClick={() => setIsMapView(false)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <div className="map-view-content">
+          <header className="map-view-header"><div><p className="eyebrow">Location overview</p><h1>Locate your furry babies</h1><p>See every located QR tag and the pet connected to it.</p></div><div className="map-view-stats"><span><strong>{locatedTags.length}</strong> located</span><span className={missingTags.length ? "alert" : ""}><strong>{missingTags.length}</strong> missing</span></div></header>
+          <section className="map-view-panel">
+            <TagsOverviewMap tags={tags} pets={pets} owner={user} onSelectTag={(tag) => { setIsMapView(false); setSelectedTag(tag); }} />
+            {!locatedTags.length && <div className="map-view-empty"><MapPin /><h2>No tag locations yet</h2><p>Open a QR tag and set its location to make it appear here.</p></div>}
+            <div className="map-view-legend"><span><i className="legend-photo" /> Located pet</span><span><i className="legend-missing">⚑</i> Missing pet</span></div>
+          </section>
+        </div>
+      </main>
+    );
   }
 
   if (selectedPet) {
@@ -295,7 +346,28 @@ export function Home({ user, onSignOut }: HomeProps) {
   if (selectedTag) {
     const pet = getTagPet(selectedTag);
     const publicUrl = getPublicTagUrl(selectedTag);
-    return <main className="home-page"><nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav><div className="tag-details-page"><section className={`tag-hero tag-${selectedTag.color}`}><div className="tag-qr"><QRCodeImage value={publicUrl} label={selectedTag.label} /></div><div><p className="eyebrow">Smart QR tag</p><h1>{selectedTag.label}</h1><p>{pet ? `Linked to ${pet.name}` : "Not assigned to a pet"}</p><span className={`tag-state ${selectedTag.isActive ? "active" : "inactive"}`}>{selectedTag.isActive ? "Active" : "Paused"}</span></div></section><section className="tag-details-grid"><div className="pet-info-card"><h2>Tag settings</h2><div className="field-group"><Label htmlFor="tag-pet">Assigned pet</Label><select id="tag-pet" value={getTagPetId(selectedTag)} onChange={(event) => changeTagPet(selectedTag, event.target.value)}><option value="">Not assigned</option>{pets.map((item) => <option key={item.$id} value={item.$id}>{item.name}</option>)}</select></div><dl><div><dt>Color</dt><dd className="capitalize">{selectedTag.color}</dd></div><div><dt>Issued</dt><dd>{new Date(selectedTag.issuedAt).toLocaleString()}</dd></div><div><dt>Tag ID</dt><dd>{selectedTag.$id}</dd></div></dl><div className="tag-setting-actions"><Button variant="outline" onClick={() => toggleTag(selectedTag)}>{selectedTag.isActive ? "Pause tag" : "Activate tag"}</Button><Button variant="destructive" onClick={() => removeTag(selectedTag.$id)}>Delete tag</Button></div></div><div className="pet-info-card"><h2>Public profile link</h2><p className="tag-help">This is the URL encoded in the QR. It works without signing in while the tag is active and assigned.</p><a className="public-profile-link" href={publicUrl} target="_blank" rel="noreferrer"><span>{publicUrl}</span><ExternalLink /></a>{pet && <button className="tag-linked-pet" onClick={() => { setSelectedTag(null); setSelectedPet(pet); }}><span>View {pet.name}’s full profile</span><ChevronRight /></button>}</div></section></div></main>;
+    const location = selectedTag.location;
+    return (
+      <main className="home-page">
+        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <div className="tag-details-page">
+          <section className={`tag-hero tag-${selectedTag.color}`}><div className="tag-qr"><QRCodeImage value={publicUrl} label={selectedTag.label} /></div><div><p className="eyebrow">Smart QR tag</p><h1>{selectedTag.label}</h1><p>{pet ? `Linked to ${pet.name}` : "Not assigned to a pet"}</p><span className={`tag-state ${selectedTag.isActive ? "active" : "inactive"}`}>{selectedTag.isActive ? "Active" : "Paused"}</span></div></section>
+          {tagError && <p className="home-error" role="alert">{tagError}</p>}
+          <section className="tag-location-card pet-info-card">
+            <div className="tag-location-heading"><div><p className="eyebrow">Last reported position</p><h2>Tag location</h2></div><Button variant="outline" onClick={() => useCurrentTagLocation(selectedTag)} disabled={isSavingTagLocation}><MapPin /> {isSavingTagLocation ? "Saving…" : "Use current location"}</Button></div>
+            <TagLocationMap label={selectedTag.label} location={location} onLocationChange={(latitude, longitude) => saveTagLocation(selectedTag, latitude, longitude)} />
+            <p className="tag-map-help">Drag the pin or click anywhere on the map. The new coordinates are saved automatically.</p>
+            {location && <div className="tag-map-meta"><span><MapPin /> {location[1].toFixed(6)}, {location[0].toFixed(6)}</span><a href={`https://www.openstreetmap.org/?mlat=${location[1]}&mlon=${location[0]}#map=16/${location[1]}/${location[0]}`} target="_blank" rel="noreferrer">Open larger map <ExternalLink /></a></div>}
+            <form key={location?.join(",") ?? "empty"} className="tag-coordinate-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void saveTagLocation(selectedTag, Number(data.get("latitude")), Number(data.get("longitude"))); }}>
+              <div className="field-group"><Label htmlFor="tag-latitude">Latitude</Label><Input id="tag-latitude" name="latitude" type="number" min="-90" max="90" step="any" defaultValue={location?.[1]} placeholder="12.971599" required /></div>
+              <div className="field-group"><Label htmlFor="tag-longitude">Longitude</Label><Input id="tag-longitude" name="longitude" type="number" min="-180" max="180" step="any" defaultValue={location?.[0]} placeholder="77.594566" required /></div>
+              <Button type="submit" disabled={isSavingTagLocation}>{isSavingTagLocation ? "Saving…" : "Save location"}</Button>
+            </form>
+          </section>
+          <section className="tag-details-grid"><div className="pet-info-card"><h2>Tag settings</h2><div className="field-group"><Label htmlFor="tag-pet">Assigned pet</Label><select id="tag-pet" value={getTagPetId(selectedTag)} onChange={(event) => changeTagPet(selectedTag, event.target.value)}><option value="">Not assigned</option>{pets.map((item) => <option key={item.$id} value={item.$id}>{item.name}</option>)}</select></div><dl><div><dt>Color</dt><dd className="capitalize">{selectedTag.color}</dd></div><div><dt>Issued</dt><dd>{new Date(selectedTag.issuedAt).toLocaleString()}</dd></div><div><dt>Tag ID</dt><dd>{selectedTag.$id}</dd></div></dl><div className="tag-setting-actions"><Button variant="outline" onClick={() => toggleTag(selectedTag)}>{selectedTag.isActive ? "Pause tag" : "Activate tag"}</Button><Button variant="destructive" onClick={() => removeTag(selectedTag.$id)}>Delete tag</Button></div></div><div className="pet-info-card"><h2>Public profile link</h2><p className="tag-help">This is the URL encoded in the QR. It works without signing in while the tag is active and assigned.</p><a className="public-profile-link" href={publicUrl} target="_blank" rel="noreferrer"><span>{publicUrl}</span><ExternalLink /></a>{pet && <button className="tag-linked-pet" onClick={() => { setSelectedTag(null); setSelectedPet(pet); }}><span>View {pet.name}’s full profile</span><ChevronRight /></button>}</div></section>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -321,6 +393,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             <p>Everything your pets need, lovingly kept in one place.</p>
           </div>
           <div className="banner-actions">
+            <Button variant="outline" className="map-view-button" onClick={() => setIsMapView(true)}><MapIcon /> Map view</Button>
             <Button className="add-vet-button" onClick={() => setIsAddingVet(true)}><Stethoscope /> Add vet contact</Button>
             <Button className="add-pet-button" onClick={() => setIsAddingPet(true)}><Plus /> Add a pet</Button>
           </div>
