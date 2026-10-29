@@ -148,7 +148,8 @@
 .vet-section { margin-top: 2rem; }
 .vet-section .section-heading > button { border: 1px solid #d7d4cb; background: #fffdf8; }
 .vet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.vet-card { display: flex; align-items: flex-start; gap: .85rem; padding: 1.1rem; border: 1px solid #e1ded4; border-radius: 1rem; background: #fffdf8; }
+.vet-card { display: flex; align-items: flex-start; gap: .85rem; padding: 1.1rem; border: 1px solid #e1ded4; border-radius: 1rem; background: #fffdf8; cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.vet-card:hover, .vet-card:focus-visible { border-color: #d2a982; box-shadow: 0 .7rem 1.8rem rgb(119 78 43 / .1); transform: translateY(-2px); outline: none; }
 .vet-avatar { display: grid; place-items: center; flex: none; width: 2.7rem; height: 2.7rem; color: #9a5d2e; border-radius: .8rem; background: #f3dfcc; }
 .vet-avatar svg { width: 1.15rem; }
 .vet-card > div { min-width: 0; }
@@ -210,6 +211,29 @@
 .pet-info-card dd { margin: 0; color: #34362f; font-size: .82rem; font-weight: 650; overflow-wrap: anywhere; }
 .location-value { display: inline-flex; align-items: center; gap: .3rem; }
 .location-value svg { width: .9rem; }
+.vet-details-page { width: min(100% - 2.5rem, 64rem); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) 0; }
+.vet-details-header { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.25rem; padding: clamp(1.5rem, 4vw, 2.5rem); color: #fff; border-radius: 1.5rem; background: #315c4b; }
+.vet-details-avatar { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; color: #9a5d2e; border-radius: 1.25rem; background: #f3dfcc; transform: rotate(-3deg); }
+.vet-details-avatar svg { width: 2rem; height: 2rem; }
+.vet-details-header .eyebrow { margin-bottom: .35rem; color: #f5bd7c; }
+.vet-details-header h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 500; letter-spacing: -.05em; line-height: 1; }
+.vet-details-header div > p:last-child { margin: .6rem 0 0; color: rgb(255 255 255 / .7); }
+.vet-call-button { display: inline-flex; align-items: center; gap: .45rem; padding: .8rem 1rem; color: #315c4b; border-radius: .75rem; background: #fff8e8; font-size: .82rem; font-weight: 750; text-decoration: none; }
+.vet-call-button svg { width: 1rem; }
+.vet-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.detail-phone-link { color: #315c4b; text-underline-offset: .2rem; }
+.assigned-pet-list { display: grid; gap: .6rem; }
+.assigned-pet-list button { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .7rem; border: 1px solid #e8e4da; border-radius: .8rem; background: #faf8f2; text-align: left; cursor: pointer; }
+.assigned-pet-list button:hover { border-color: #9aafa5; background: #f1f6f2; }
+.assigned-pet-list img, .assigned-pet-list button > span { display: grid; place-items: center; flex: none; width: 2.6rem; height: 2.6rem; color: #315c4b; border-radius: .7rem; background: #dce8df; object-fit: cover; }
+.assigned-pet-list span svg { width: 1rem; }
+.assigned-pet-list button > div { display: grid; flex: 1; gap: .15rem; }
+.assigned-pet-list strong { color: #34362f; font-family: Georgia, "Times New Roman", serif; font-size: 1rem; font-weight: 500; }
+.assigned-pet-list small { color: #88857c; font-size: .68rem; }
+.assigned-pet-list button > svg { width: 1rem; color: #7b847e; }
+.empty-assignment { display: grid; place-items: center; min-height: 12rem; color: #8b8d86; text-align: center; }
+.empty-assignment svg { width: 2rem; opacity: .55; }
+.empty-assignment p { margin: .75rem 0 0; font-size: .8rem; }
 
 @media (max-width: 760px) {
   .home-nav { height: 4.7rem; }
@@ -226,5 +250,8 @@
   .pet-details-header { align-items: flex-start; flex-direction: column; }
   .pet-gallery { grid-template-rows: repeat(2, 8rem); }
   .pet-details-grid { grid-template-columns: 1fr; }
+  .vet-details-header { grid-template-columns: auto 1fr; }
+  .vet-call-button { grid-column: 1 / -1; justify-content: center; }
+  .vet-details-grid { grid-template-columns: 1fr; }
   .pet-info-card dl > div { grid-template-columns: 7rem 1fr; }
 }

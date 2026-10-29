@@ -19,6 +19,7 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [vetContacts, setVetContacts] = useState<VetContact[]>([]);
+  const [selectedVet, setSelectedVet] = useState<VetContact | null>(null);
   const [isAddingVet, setIsAddingVet] = useState(false);
   const [isSavingVet, setIsSavingVet] = useState(false);
   const [vetError, setVetError] = useState("");
@@ -218,6 +219,26 @@ export function Home({ user, onSignOut }: HomeProps) {
     );
   }
 
+  if (selectedVet) {
+    const assignedPets = pets.filter((pet) => getVetId(pet) === selectedVet.$id);
+    return (
+      <main className="home-page">
+        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedVet(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <div className="vet-details-page">
+          <header className="vet-details-header">
+            <span className="vet-details-avatar"><Stethoscope /></span>
+            <div><p className="eyebrow">Trusted care</p><h1>{selectedVet.name}</h1><p>{selectedVet.clinic || "Veterinary contact"}</p></div>
+            <a className="vet-call-button" href={`tel:${selectedVet.phone}`}><Phone /> Call vet</a>
+          </header>
+          <section className="vet-details-grid">
+            <div className="pet-info-card"><h2>Contact information</h2><dl><div><dt>Name</dt><dd>{selectedVet.name}</dd></div><div><dt>Clinic</dt><dd>{selectedVet.clinic || "Not provided"}</dd></div><div><dt>Phone</dt><dd><a className="detail-phone-link" href={`tel:${selectedVet.phone}`}>{selectedVet.phone}</a></dd></div><div><dt>Added</dt><dd>{new Date(selectedVet.$createdAt).toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{new Date(selectedVet.$updatedAt).toLocaleString()}</dd></div></dl></div>
+            <div className="pet-info-card"><h2>Assigned pets</h2>{assignedPets.length ? <div className="assigned-pet-list">{assignedPets.map((pet) => <button key={pet.$id} onClick={() => { setSelectedVet(null); setSelectedPet(pet); }}>{pet.photoUrl ? <img src={pet.photoUrl} alt="" /> : <span><PawPrint /></span>}<div><strong>{pet.name}</strong><small>{[pet.breed, pet.color].filter(Boolean).join(" · ") || "Pet profile"}</small></div><ChevronRight /></button>)}</div> : <div className="empty-assignment"><PawPrint /><p>No pets are assigned to this vet yet.</p></div>}</div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="home-page">
       <nav className="home-nav">
@@ -271,10 +292,10 @@ export function Home({ user, onSignOut }: HomeProps) {
             <div className="section-heading"><div><p className="eyebrow">Trusted care</p><h2>Vet contacts</h2></div><Button variant="outline" size="sm" onClick={() => setIsAddingVet(true)}><Plus /> Add contact</Button></div>
             <div className="vet-grid">
               {vetContacts.map((vet) => (
-                <article className="vet-card" key={vet.$id}>
+                <article className="vet-card" key={vet.$id} onClick={() => setSelectedVet(vet)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedVet(vet); }}>
                   <span className="vet-avatar"><Stethoscope /></span>
-                  <div><h3>{vet.name}</h3><p>{vet.clinic || "Veterinary contact"}</p><a href={`tel:${vet.phone}`}><Phone /> {vet.phone}</a></div>
-                  <button onClick={() => removeVetContact(vet.$id)} aria-label={`Remove ${vet.name}`}><Trash2 /></button>
+                  <div><h3>{vet.name}</h3><p>{vet.clinic || "Veterinary contact"}</p><a href={`tel:${vet.phone}`} onClick={(event) => event.stopPropagation()}><Phone /> {vet.phone}</a></div>
+                  <button onClick={(event) => { event.stopPropagation(); removeVetContact(vet.$id); }} aria-label={`Remove ${vet.name}`}><Trash2 /></button>
                 </article>
               ))}
             </div>
