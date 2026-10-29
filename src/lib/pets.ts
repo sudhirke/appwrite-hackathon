@@ -1,4 +1,4 @@
-import { Client, ID, Permission, Query, Role, TablesDB, type Models } from "appwrite";
+import { Client, ID, Permission, Query, Role, Storage, TablesDB, type Models } from "appwrite";
 import type { VetContact } from "./vets";
 
 type PublicFlags = { showName: boolean };
@@ -11,6 +11,7 @@ type PetFields = {
   birthDate?: string;
   microchipId?: string;
   photoUrl?: string;
+  photoUrls?: string;
   status: "safe" | "missing";
   lastKnownLocation?: [number, number];
   lastSeenAt?: string;
@@ -27,6 +28,7 @@ export type NewPet = {
   birthDate?: string;
   microchipId?: string;
   photoUrl?: string;
+  photoUrls?: string[];
   status: Pet["status"];
   lastKnownLocation?: [number, number];
   lastSeenAt?: string;
@@ -35,7 +37,8 @@ export type NewPet = {
 
 type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
 
-let servicePromise: Promise<{ tables: TablesDB; databaseId: string }> | undefined;
+let servicePromise: Promise<{ tables: TablesDB; storage: Storage; databaseId: string }> | undefined;
+const PET_PHOTOS_BUCKET_ID = "pet-photos";
 
 async function getService() {
   servicePromise ??= fetch("/api/appwrite-config")
@@ -45,7 +48,8 @@ async function getService() {
     })
     .then(({ endpoint, projectId, databaseId }) => {
       if (!endpoint || !projectId || !databaseId) throw new Error("The pet database is not configured.");
-      return { tables: new TablesDB(new Client().setEndpoint(endpoint).setProject(projectId)), databaseId };
+      const client = new Client().setEndpoint(endpoint).setProject(projectId);
+      return { tables: new TablesDB(client), storage: new Storage(client), databaseId };
     });
   return servicePromise;
 }
@@ -72,6 +76,7 @@ export async function createPet(ownerId: string, pet: NewPet) {
     ...(pet.birthDate && { birthDate: pet.birthDate }),
     ...(pet.microchipId && { microchipId: pet.microchipId }),
     ...(pet.photoUrl && { photoUrl: pet.photoUrl }),
+    ...(pet.photoUrls?.length && { photoUrls: JSON.stringify(pet.photoUrls) }),
     ...(pet.lastKnownLocation && { lastKnownLocation: pet.lastKnownLocation }),
     ...(pet.lastSeenAt && { lastSeenAt: pet.lastSeenAt }),
     ...(pet.publicFlags && { publicFlags: JSON.stringify(pet.publicFlags) }),
@@ -99,4 +104,37 @@ export async function updatePetVetContact(rowId: string, vetContactId: string | 
     rowId,
     data: { vetContactId },
   });
+}
+
+export async function updatePet(rowId: string, pet: NewPet) {
+  const { tables, databaseId } = await getService();
+  return tables.updateRow<Pet>({
+    databaseId,
+    tableId: "pets",
+    rowId,
+    data: {
+      name: pet.name,
+      breed: pet.breed || null,
+      color: pet.color || null,
+      birthDate: pet.birthDate || null,
+      microchipId: pet.microchipId || null,
+      photoUrl: pet.photoUrl || null,
+      photoUrls: pet.photoUrls?.length ? JSON.stringify(pet.photoUrls) : null,
+      status: pet.status,
+      lastKnownLocation: pet.lastKnownLocation || null,
+      lastSeenAt: pet.lastSeenAt || null,
+      ...(pet.publicFlags && { publicFlags: JSON.stringify(pet.publicFlags) }),
+    } as unknown as Partial<Pet>,
+  });
+}
+
+export async function uploadPetPhoto(ownerId: string, file: File) {
+  const { storage } = await getService();
+  const uploaded = await storage.createFile({
+    bucketId: PET_PHOTOS_BUCKET_ID,
+    fileId: ID.unique(),
+    file,
+    permissions: [Permission.read(Role.user(ownerId)), Permission.update(Role.user(ownerId)), Permission.delete(Role.user(ownerId))],
+  });
+  return storage.getFileView({ bucketId: PET_PHOTOS_BUCKET_ID, fileId: uploaded.$id }).toString();
 }

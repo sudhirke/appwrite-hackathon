@@ -5,6 +5,7 @@ import {
   RelationMutate,
   RelationshipType,
   Role,
+  Storage,
   TablesDB,
   TablesDBIndexType,
 } from "node-appwrite";
@@ -15,10 +16,15 @@ const databaseId = process.env.REACT_APP_APPWRITE_DATABASE_ID;
 const apiKey = process.env.APPWRITE_API_KEY;
 
 if (!endpoint || !projectId || !databaseId || !apiKey) {
-  throw new Error("Missing Appwrite endpoint, project ID, database ID, or API key in .env");
+  throw new Error(
+    "Missing Appwrite endpoint, project ID, database ID, storage id or API key in .env",
+  );
 }
 
 const tables = new TablesDB(
+  new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey),
+);
+const storage = new Storage(
   new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey),
 );
 
@@ -30,9 +36,19 @@ const definitions = [
     name: "Subscriptions",
     columns: [
       { key: "userId", type: "varchar", size: 36, required: true },
-      { key: "tier", type: "enum", elements: ["free", "basic", "premium"], required: true },
+      {
+        key: "tier",
+        type: "enum",
+        elements: ["free", "basic", "premium"],
+        required: true,
+      },
       { key: "status", type: "varchar", size: 32, required: true },
-      { key: "stripeSubscriptionId", type: "varchar", size: 255, required: false },
+      {
+        key: "stripeSubscriptionId",
+        type: "varchar",
+        size: 255,
+        required: false,
+      },
       { key: "currentPeriodEnd", type: "datetime", required: false },
     ],
     indexes: [
@@ -51,14 +67,24 @@ const definitions = [
       { key: "birthDate", type: "datetime", required: false },
       { key: "microchipId", type: "varchar", size: 128, required: false },
       { key: "photoUrl", type: "url", required: false },
-      { key: "status", type: "enum", elements: ["safe", "missing"], required: true },
+      { key: "photoUrls", type: "text", required: false },
+      {
+        key: "status",
+        type: "enum",
+        elements: ["safe", "missing"],
+        required: true,
+      },
       { key: "lastKnownLocation", type: "point", required: false },
       { key: "lastSeenAt", type: "datetime", required: false },
       { key: "publicFlags", type: "text", required: false },
     ],
     indexes: [
       { key: "owner_idx", type: "key", attributes: ["ownerId"] },
-      { key: "owner_status_idx", type: "key", attributes: ["ownerId", "status"] },
+      {
+        key: "owner_status_idx",
+        type: "key",
+        attributes: ["ownerId", "status"],
+      },
       { key: "microchip_unique", type: "unique", attributes: ["microchipId"] },
     ],
   },
@@ -110,13 +136,27 @@ const definitions = [
     columns: [
       { key: "originLocation", type: "point", required: true },
       { key: "radiusKm", type: "integer", required: true, min: 1, max: 500 },
-      { key: "status", type: "enum", elements: ["active", "resolved"], required: true },
+      {
+        key: "status",
+        type: "enum",
+        elements: ["active", "resolved"],
+        required: true,
+      },
       { key: "createdAt", type: "datetime", required: true },
       { key: "resolvedAt", type: "datetime", required: false },
     ],
     indexes: [
-      { key: "status_created_idx", type: "key", attributes: ["status", "createdAt"], orders: ["ASC", "DESC"] },
-      { key: "origin_spatial", type: "spatial", attributes: ["originLocation"] },
+      {
+        key: "status_created_idx",
+        type: "key",
+        attributes: ["status", "createdAt"],
+        orders: ["ASC", "DESC"],
+      },
+      {
+        key: "origin_spatial",
+        type: "spatial",
+        attributes: ["originLocation"],
+      },
     ],
   },
   {
@@ -129,7 +169,12 @@ const definitions = [
       { key: "scannedAt", type: "datetime", required: true },
     ],
     indexes: [
-      { key: "scanned_at_idx", type: "key", attributes: ["scannedAt"], orders: ["DESC"] },
+      {
+        key: "scanned_at_idx",
+        type: "key",
+        attributes: ["scannedAt"],
+        orders: ["DESC"],
+      },
     ],
   },
   {
@@ -137,7 +182,12 @@ const definitions = [
     name: "Alert Notifications",
     columns: [
       { key: "userId", type: "varchar", size: 36, required: true },
-      { key: "channel", type: "enum", elements: ["push", "sms", "email"], required: true },
+      {
+        key: "channel",
+        type: "enum",
+        elements: ["push", "sms", "email"],
+        required: true,
+      },
       { key: "deliveryStatus", type: "varchar", size: 32, required: true },
       { key: "sentAt", type: "datetime", required: false },
     ],
@@ -149,15 +199,69 @@ const definitions = [
 ] as const;
 
 const relationships = [
-  { tableId: "pets", relatedTableId: "vet_contacts", key: "vetContactId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.SetNull },
-  { tableId: "qr_tags", relatedTableId: "pets", key: "petId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
-  { tableId: "vaccinations", relatedTableId: "pets", key: "petId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
-  { tableId: "medications", relatedTableId: "pets", key: "petId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
-  { tableId: "alerts", relatedTableId: "pets", key: "petId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
-  { tableId: "scans", relatedTableId: "pets", key: "petId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
-  { tableId: "scans", relatedTableId: "qr_tags", key: "tagId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.SetNull },
-  { tableId: "scans", relatedTableId: "alerts", key: "alertId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.SetNull },
-  { tableId: "alert_notifications", relatedTableId: "alerts", key: "alertId", type: RelationshipType.ManyToOne, onDelete: RelationMutate.Cascade },
+  {
+    tableId: "pets",
+    relatedTableId: "vet_contacts",
+    key: "vetContactId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.SetNull,
+  },
+  {
+    tableId: "qr_tags",
+    relatedTableId: "pets",
+    key: "petId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
+  {
+    tableId: "vaccinations",
+    relatedTableId: "pets",
+    key: "petId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
+  {
+    tableId: "medications",
+    relatedTableId: "pets",
+    key: "petId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
+  {
+    tableId: "alerts",
+    relatedTableId: "pets",
+    key: "petId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
+  {
+    tableId: "scans",
+    relatedTableId: "pets",
+    key: "petId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
+  {
+    tableId: "scans",
+    relatedTableId: "qr_tags",
+    key: "tagId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.SetNull,
+  },
+  {
+    tableId: "scans",
+    relatedTableId: "alerts",
+    key: "alertId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.SetNull,
+  },
+  {
+    tableId: "alert_notifications",
+    relatedTableId: "alerts",
+    key: "alertId",
+    type: RelationshipType.ManyToOne,
+    onDelete: RelationMutate.Cascade,
+  },
 ] as const;
 
 async function exists(tableId: string) {
@@ -191,10 +295,21 @@ for (const definition of definitions) {
   console.log(`created table ${definition.id}`);
 }
 
+const petColumns = await tables.listColumns({ databaseId, tableId: "pets" });
+if (!petColumns.columns.some((column) => column.key === "photoUrls")) {
+  await tables.createTextColumn({ databaseId, tableId: "pets", key: "photoUrls", required: false });
+  console.log("created column pets.photoUrls");
+}
+
 for (const relationship of relationships) {
-  const columns = await tables.listColumns({ databaseId, tableId: relationship.tableId });
+  const columns = await tables.listColumns({
+    databaseId,
+    tableId: relationship.tableId,
+  });
   if (columns.columns.some((column) => column.key === relationship.key)) {
-    console.log(`skip relationship ${relationship.tableId}.${relationship.key}`);
+    console.log(
+      `skip relationship ${relationship.tableId}.${relationship.key}`,
+    );
     continue;
   }
 
@@ -207,7 +322,25 @@ for (const relationship of relationships) {
     twoWay: false,
     onDelete: relationship.onDelete,
   });
-  console.log(`created relationship ${relationship.tableId}.${relationship.key}`);
+  console.log(
+    `created relationship ${relationship.tableId}.${relationship.key}`,
+  );
+}
+
+try {
+  await storage.getBucket({ bucketId: "pet-photos" });
+  console.log("skip bucket pet-photos");
+} catch (error) {
+  if (!(error instanceof AppwriteException) || error.code !== 404) throw error;
+  await storage.createBucket({
+    bucketId: "pet-photos",
+    name: "Pet Photos",
+    permissions: [Permission.create(Role.users())],
+    fileSecurity: true,
+    maximumFileSize: 10 * 1024 * 1024,
+    allowedFileExtensions: ["jpg", "jpeg", "png", "webp", "gif"],
+  });
+  console.log("created bucket pet-photos");
 }
 
 console.log(`Appwrite schema is ready in database ${databaseId}.`);
