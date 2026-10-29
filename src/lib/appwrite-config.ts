@@ -1,9 +1,9 @@
 export type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
 
 const embeddedConfig: Partial<AppwriteConfig> = {
-  endpoint: process.env.REACT_APP_APPWRITE_ENDPOINT || "",
-  projectId: process.env.REACT_APP_APPWRITE_PROJECT_ID || "",
-  databaseId: process.env.REACT_APP_APPWRITE_DATABASE_ID || "",
+  endpoint: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_ENDPOINT || "" : "",
+  projectId: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_PROJECT_ID || "" : "",
+  databaseId: typeof process !== "undefined" ? process.env.REACT_APP_APPWRITE_DATABASE_ID || "" : "",
 };
 
 let configPromise: Promise<AppwriteConfig> | undefined;
