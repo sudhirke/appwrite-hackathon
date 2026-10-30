@@ -10,12 +10,14 @@ const appwriteConfig = {
   endpoint: process.env.REACT_APP_APPWRITE_ENDPOINT || process.env.APPWRITE_SITE_API_ENDPOINT || "",
   projectId: process.env.REACT_APP_APPWRITE_PROJECT_ID || process.env.APPWRITE_SITE_PROJECT_ID || "",
   databaseId: process.env.REACT_APP_APPWRITE_DATABASE_ID || "",
+  publicPetFunctionId: process.env.REACT_APP_PUBLIC_PET_FUNCTION_ID || "public-pet-api",
 };
 
 console.log("Appwrite build configuration:", {
   hasEndpoint: Boolean(appwriteConfig.endpoint),
   hasProjectId: Boolean(appwriteConfig.projectId),
   hasDatabaseId: Boolean(appwriteConfig.databaseId),
+  hasPublicPetFunctionId: Boolean(appwriteConfig.publicPetFunctionId),
 });
 
 const result = await Bun.build({

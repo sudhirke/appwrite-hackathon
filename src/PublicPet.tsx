@@ -1,7 +1,6 @@
 import { MapPin, PawPrint, Phone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
-type PublicPetData = { name?: string; breed?: string; color?: string; photoUrls: string[]; status: "safe" | "missing"; lastSeenAt?: string; lastKnownLocation?: [number, number]; vet?: { name: string; clinic?: string; phone: string } };
+import { getPublicPet, reportPublicPetScan, type PublicPetData } from "./lib/public-pet-api";
 
 export function PublicPet({ token }: { token: string }) {
   const [pet, setPet] = useState<PublicPetData | null>(null);
@@ -10,11 +9,7 @@ export function PublicPet({ token }: { token: string }) {
   const scanReported = useRef(false);
 
   useEffect(() => {
-    fetch(`/api/public/pets/${encodeURIComponent(token)}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error(response.status === 404 ? "This tag is not active or has not been assigned." : "Could not load this pet profile.");
-        return response.json() as Promise<PublicPetData>;
-      })
+    getPublicPet(token)
       .then(setPet)
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load this pet profile."));
   }, [token]);
@@ -24,12 +19,7 @@ export function PublicPet({ token }: { token: string }) {
     scanReported.current = true;
     const reportScan = async (payload: { consentGiven: boolean; latitude?: number; longitude?: number }) => {
       try {
-        const response = await fetch(`/api/public/pets/${encodeURIComponent(token)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) throw new Error("Scan could not be recorded.");
+        await reportPublicPetScan(token, payload);
         setScanMessage(payload.consentGiven ? "Scan and current location shared with the pet owner." : "Scan recorded without location.");
       } catch { setScanMessage("The pet profile is available, but this scan could not be recorded."); }
     };

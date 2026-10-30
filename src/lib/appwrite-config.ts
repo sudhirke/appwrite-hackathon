@@ -1,11 +1,11 @@
-export type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string };
+export type AppwriteConfig = { endpoint: string; projectId: string; databaseId: string; publicPetFunctionId: string };
 
 declare const __APPWRITE_CONFIG__: Partial<AppwriteConfig> | undefined;
 
 const embeddedConfig: Partial<AppwriteConfig> = typeof __APPWRITE_CONFIG__ !== "undefined" ? __APPWRITE_CONFIG__ : {};
 
 let configPromise: Promise<AppwriteConfig> | undefined;
-const complete = (config: Partial<AppwriteConfig>): config is AppwriteConfig => Boolean(config.endpoint && config.projectId && config.databaseId);
+const complete = (config: Partial<AppwriteConfig>): config is AppwriteConfig => Boolean(config.endpoint && config.projectId && config.databaseId && config.publicPetFunctionId);
 
 export function getAppwriteConfig() {
   configPromise ??= loadConfig();
