@@ -64,19 +64,31 @@ async function recordScan(req, res, token) {
   const hasLocation = consentGiven && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
   if (consentGiven && !hasLocation) return json(res, { error: "Valid coordinates are required when location consent is granted." }, 400);
 
+  const scannedAt = new Date().toISOString();
   const scan = await tables.createRow({
     databaseId,
     tableId: "scans",
     rowId: ID.unique(),
     data: {
       consentGiven,
-      scannedAt: new Date().toISOString(),
+      scannedAt,
       tagId: tag.$id,
       petId,
       ...(hasLocation && { location: [longitude, latitude] }),
     },
     permissions: [Permission.read(Role.user(tag.ownerId))],
   });
+
+  await tables.updateRow({
+    databaseId,
+    tableId: "pets",
+    rowId: petId,
+    data: {
+      lastSeenAt: scannedAt,
+      ...(hasLocation && { lastKnownLocation: [longitude, latitude] }),
+    },
+  });
+
   return json(res, { scanId: scan.$id, locationRecorded: hasLocation }, 201);
 }
 
