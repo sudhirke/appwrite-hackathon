@@ -1,0 +1,13 @@
+{
+  "name": "public-pet-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "node-appwrite": "^31.0.0"
+  }
+}
