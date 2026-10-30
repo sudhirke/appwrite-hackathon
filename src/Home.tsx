@@ -7,6 +7,7 @@ import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 import { QRCodeImage } from "./QRCodeImage";
+import { PetQrActivity } from "./PetQrActivity";
 import { ScanLocationMap } from "./ScanLocationMap";
 import { TagLocationMap } from "./TagLocationMap";
 import { TagsOverviewMap } from "./TagsOverviewMap";
@@ -338,6 +339,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             <div className="pet-info-card"><h2>Pet details</h2><dl><div><dt>Breed</dt><dd>{selectedPet.breed || "Not provided"}</dd></div><div><dt>Color</dt><dd>{selectedPet.color || "Not provided"}</dd></div><div><dt>Birth date</dt><dd>{selectedPet.birthDate ? new Date(selectedPet.birthDate).toLocaleDateString() : "Not provided"}</dd></div><div><dt>Microchip ID</dt><dd>{selectedPet.microchipId || "Not provided"}</dd></div><div><dt>Public QR name</dt><dd>{showsNamePublicly(selectedPet) ? "Visible" : "Hidden"}</dd></div></dl></div>
             <div className="pet-info-card"><h2>Care & location</h2><dl><div><dt>Vet</dt><dd>{vet ? `${vet.name}${vet.clinic ? ` · ${vet.clinic}` : ""}` : "Not assigned"}</dd></div><div><dt>Vet phone</dt><dd>{vet?.phone || "Not provided"}</dd></div><div><dt>Last seen</dt><dd>{selectedPet.lastSeenAt ? new Date(selectedPet.lastSeenAt).toLocaleString() : "Not provided"}</dd></div><div><dt>Last known location</dt><dd>{selectedPet.lastKnownLocation ? <span className="location-value"><MapPin /> {selectedPet.lastKnownLocation[1]}, {selectedPet.lastKnownLocation[0]}</span> : "Not provided"}</dd></div><div><dt>Profile created</dt><dd>{new Date(selectedPet.$createdAt).toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{new Date(selectedPet.$updatedAt).toLocaleString()}</dd></div></dl></div>
           </section>
+          <PetQrActivity pet={selectedPet} tags={tags} owner={user} vet={vet} onSelectTag={(tag) => { setSelectedPet(null); setSelectedTag(tag); }} />
         </div>
       </main>
     );
