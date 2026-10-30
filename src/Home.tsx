@@ -7,8 +7,10 @@ import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 import { QRCodeImage } from "./QRCodeImage";
+import { ScanLocationMap } from "./ScanLocationMap";
 import { TagLocationMap } from "./TagLocationMap";
 import { TagsOverviewMap } from "./TagsOverviewMap";
+import { listTagScans, type TagScan } from "./lib/scans";
 import { assignTag, createTag, deleteTag, listTags, setTagActive, updateTagLocation, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
@@ -34,6 +36,9 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [tagError, setTagError] = useState("");
   const [isSavingTagLocation, setIsSavingTagLocation] = useState(false);
   const [isMapView, setIsMapView] = useState(false);
+  const [tagScans, setTagScans] = useState<TagScan[]>([]);
+  const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const [isLoadingScans, setIsLoadingScans] = useState(false);
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
 
   useEffect(() => {
@@ -56,6 +61,21 @@ export function Home({ user, onSignOut }: HomeProps) {
   useEffect(() => {
     document.title = isMapView ? "Locate your furry babies · Pets Heaven" : "Pets Heaven";
   }, [isMapView]);
+
+  useEffect(() => {
+    if (!selectedTag) { setTagScans([]); setSelectedScanId(null); return; }
+    let active = true;
+    setIsLoadingScans(true);
+    listTagScans(selectedTag.$id)
+      .then((scans) => {
+        if (!active) return;
+        setTagScans(scans);
+        setSelectedScanId(scans.find((scan) => scan.location)?.$id ?? null);
+      })
+      .catch((error) => { if (active) setTagError(error instanceof Error ? error.message : "Could not load scan history."); })
+      .finally(() => { if (active) setIsLoadingScans(false); });
+    return () => { active = false; };
+  }, [selectedTag?.$id]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -344,9 +364,11 @@ export function Home({ user, onSignOut }: HomeProps) {
   }
 
   if (selectedTag) {
-    const pet = getTagPet(selectedTag);
+    const pet = getTagPet(selectedTag) ?? undefined;
+    const vet = pet ? (typeof pet.vetContactId === "string" ? vetContacts.find((item) => item.$id === pet.vetContactId) : pet.vetContactId) : undefined;
     const publicUrl = getPublicTagUrl(selectedTag);
     const location = selectedTag.location;
+    const selectedScan = tagScans.find((scan) => scan.$id === selectedScanId);
     return (
       <main className="home-page">
         <nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
@@ -365,6 +387,10 @@ export function Home({ user, onSignOut }: HomeProps) {
             </form>
           </section>
           <section className="tag-details-grid"><div className="pet-info-card"><h2>Tag settings</h2><div className="field-group"><Label htmlFor="tag-pet">Assigned pet</Label><select id="tag-pet" value={getTagPetId(selectedTag)} onChange={(event) => changeTagPet(selectedTag, event.target.value)}><option value="">Not assigned</option>{pets.map((item) => <option key={item.$id} value={item.$id}>{item.name}</option>)}</select></div><dl><div><dt>Color</dt><dd className="capitalize">{selectedTag.color}</dd></div><div><dt>Issued</dt><dd>{new Date(selectedTag.issuedAt).toLocaleString()}</dd></div><div><dt>Tag ID</dt><dd>{selectedTag.$id}</dd></div></dl><div className="tag-setting-actions"><Button variant="outline" onClick={() => toggleTag(selectedTag)}>{selectedTag.isActive ? "Pause tag" : "Activate tag"}</Button><Button variant="destructive" onClick={() => removeTag(selectedTag.$id)}>Delete tag</Button></div></div><div className="pet-info-card"><h2>Public profile link</h2><p className="tag-help">This is the URL encoded in the QR. It works without signing in while the tag is active and assigned.</p><a className="public-profile-link" href={publicUrl} target="_blank" rel="noreferrer"><span>{publicUrl}</span><ExternalLink /></a>{pet && <button className="tag-linked-pet" onClick={() => { setSelectedTag(null); setSelectedPet(pet); }}><span>View {pet.name}’s full profile</span><ChevronRight /></button>}</div></section>
+          <section className="scan-history-card pet-info-card">
+            <div className="scan-history-heading"><div><p className="eyebrow">QR activity</p><h2>Scan history</h2></div><span>{tagScans.length} {tagScans.length === 1 ? "scan" : "scans"}</span></div>
+            {isLoadingScans ? <p className="scan-history-empty">Loading scan history…</p> : tagScans.length ? <div className="scan-history-layout"><div className="scan-history-list">{tagScans.map((scan) => <button key={scan.$id} className={selectedScanId === scan.$id ? "selected" : ""} onClick={() => setSelectedScanId(scan.$id)}><span className={scan.location ? "scan-location-state located" : "scan-location-state"}><MapPin /></span><span><strong>{new Date(scan.scannedAt).toLocaleString()}</strong><small>{scan.location ? `${scan.location[1].toFixed(5)}, ${scan.location[0].toFixed(5)}` : "Location permission not granted"}</small></span><ChevronRight /></button>)}</div><div className="scan-history-map">{selectedScan?.location ? <><ScanLocationMap location={selectedScan.location} pet={pet} owner={user} vet={vet} /><div className="scan-map-meta"><span><MapPin /> {selectedScan.location[1].toFixed(6)}, {selectedScan.location[0].toFixed(6)}</span><a href={`https://www.openstreetmap.org/?mlat=${selectedScan.location[1]}&mlon=${selectedScan.location[0]}#map=16/${selectedScan.location[1]}/${selectedScan.location[0]}`} target="_blank" rel="noreferrer">Open map <ExternalLink /></a></div></> : <div className="scan-map-empty"><MapPin /><p>Select a scan with a shared location to view it on the map.</p></div>}</div></div> : <p className="scan-history-empty">No scans have been recorded for this tag yet.</p>}
+          </section>
         </div>
       </main>
     );
