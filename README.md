@@ -1,4 +1,4 @@
-# Petsagram 🐾
+# Petsagram 🐾 🐾 "One Scan Away from Home."
 
 Petsagram is a pet safety and profile management platform designed to help pet owners keep all important pet information in one secure place.
 
@@ -9,6 +9,13 @@ With Petsagram, you can:
 - Track vaccination records and medication history
 - Generate unique QR code tags for pet collars
 - Enable quick identification and owner contact if a pet goes missing
+
+### Our why...
+- ❤️ Cause they are more Than a Pet, A Lifeline Home.
+- 🐾 Protecting Every Paw Print.
+- 🏡 Helping Lost Pets Find Their Way Back Home.
+- 🤝 When Every Second Matters, Every Scan Counts.
+- 💕 Because They're Family.
 
 Our mission is simple: help pet owners keep their pets safe, healthy, and easily identifiable.
 
