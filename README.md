@@ -1,4 +1,18 @@
-# bun-react-tailwind-shadcn-template
+# Petsagram 🐾
+
+Petsagram is a pet safety and profile management platform designed to help pet owners keep all important pet information in one secure place.
+
+With Petsagram, you can:
+
+- Create rich pet profiles with photos and essential details
+- Store veterinarian and emergency contact information
+- Track vaccination records and medication history
+- Generate unique QR code tags for pet collars
+- Enable quick identification and owner contact if a pet goes missing
+
+Our mission is simple: help pet owners keep their pets safe, healthy, and easily identifiable.
+
+# Brewed using bun-react-tailwind-shadcn
 
 To install dependencies:
 
