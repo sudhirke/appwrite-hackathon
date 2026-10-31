@@ -53,8 +53,9 @@ async function getPublicProfile(req, res, token) {
 
 async function recordScan(req, res, token) {
   const { tables, databaseId } = getTables(req);
-  const tag = await findTag(tables, databaseId, token, ["$id", "ownerId", "petId.$id"]);
+  const tag = await findTag(tables, databaseId, token, ["$id", "ownerId", "petId.$id", "petId.status"]);
   const petId = typeof tag?.petId === "string" ? tag.petId : tag?.petId?.$id;
+  const petStatus = typeof tag?.petId === "object" ? tag.petId.status : undefined;
   if (!tag || !petId) return json(res, { error: "This tag is not active or has not been assigned." }, 404);
 
   const body = req.bodyJson && typeof req.bodyJson === "object" ? req.bodyJson : {};
@@ -70,8 +71,10 @@ async function recordScan(req, res, token) {
     tableId: "scans",
     rowId: ID.unique(),
     data: {
+      ownerId: tag.ownerId,
       consentGiven,
       scannedAt,
+      petStatusAtScan: petStatus || "safe",
       tagId: tag.$id,
       petId,
       ...(hasLocation && { location: [longitude, latitude] }),
