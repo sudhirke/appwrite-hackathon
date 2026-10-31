@@ -28,35 +28,45 @@ Our mission is simple: help pet owners keep their pets safe, healthy, and easily
 
 #### Sign-In / Sign-up
 
-![Home](image.png)
+![Home](./public/images/image.png)
 
 #### Petsagram Home
 
-![Pets / Vets Info](image-1.png)
-![QR Tags](image-2.png)
+![Pets / Vets Info](./public/images/image-1.png)
+![QR Tags](./public/images/image-2.png)
 
 #### Pet's Information
 
-![Add new Pet](image-4.png)
-![Pet's Profile](image-3.png)
-![Pet's Scan History](image-5.png)
+![Add new Pet](./public/images/image-4.png)
+![Pet's Profile](./public/images/image-3.png)
+![Pet's Scan History](./public/images/image-5.png)
 
 #### Pet's Public Profile
 
 - This page comes when anyone scans the Pet's QR tag (publically available).
 - Adds current location scan on with the QR Tag
-  ![Pet's Public Profile](image-11.png)
+  ![Pet's Public Profile](./public/images/image-11.png)
 
 #### Vet's Info
 
-![Add Vet's Contact](image-6.png)
+![Add Vet's Contact](./public/images/image-6.png)
 
 #### QR Tags
 
-![Tag Details](image-8.png)
-![Tag Settings](image-9.png)
-![Tag Scan History](image-10.png)
-![New QR Tag](image-7.png)
+![Tag Details](./public/images/image-8.png)
+![Tag Settings](./public/images/image-9.png)
+![Tag Scan History](./public/images/image-10.png)
+![New QR Tag](./public/images/image-7.png)
+
+# Environment Configuration
+
+Following configuration are required in your .env file
+
+- REACT_APP_APPWRITE_ENDPOINT=
+- REACT_APP_APPWRITE_PROJECT_ID=
+- REACT_APP_APPWRITE_DATABASE_ID=
+- REACT_APP_APPWRITE_STORAGE_ID=
+- APPWRITE_API_KEY=
 
 # Brewed using bun-react-tailwind-shadcn
 
