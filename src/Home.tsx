@@ -2,19 +2,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Bell, Bone, CalendarDays, ChevronRight, ExternalLink, Heart, LogOut, Map as MapIcon, MapPin, PawPrint, Pencil, Phone, Plus, QrCode, ShoppingBag, Sparkles, Stethoscope, Trash2, Upload, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { AuthUser } from "./lib/auth";
 import { createPet, deletePet, listPets, updatePet, updatePetVetContact, uploadPetPhoto, type NewPet, type Pet } from "./lib/pets";
 import { createVetContact, deleteVetContact, listVetContacts, type VetContact } from "./lib/vets";
 import { QRCodeImage } from "./QRCodeImage";
 import { PetQrActivity } from "./PetQrActivity";
+import { NotificationCenter } from "./NotificationCenter";
 import { ScanLocationMap } from "./ScanLocationMap";
 import { TagLocationMap } from "./TagLocationMap";
 import { TagsOverviewMap } from "./TagsOverviewMap";
-import { listTagScans, type TagScan } from "./lib/scans";
+import { listRecentScans, listTagScans, subscribeToScans, type TagScan } from "./lib/scans";
 import { assignTag, createTag, deleteTag, listTags, setTagActive, updateTagLocation, TAG_COLORS, type QRTag, type TagColor } from "./lib/tags";
 
 type HomeProps = { user: AuthUser; onSignOut: () => Promise<void> };
+
+function relationId(value: Pet | QRTag | string | null | undefined) {
+  return typeof value === "string" ? value : value?.$id;
+}
 
 export function Home({ user, onSignOut }: HomeProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -40,7 +45,46 @@ export function Home({ user, onSignOut }: HomeProps) {
   const [tagScans, setTagScans] = useState<TagScan[]>([]);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
   const [isLoadingScans, setIsLoadingScans] = useState(false);
+  const [recentScans, setRecentScans] = useState<TagScan[]>([]);
+  const [unreadScanIds, setUnreadScanIds] = useState<Set<string>>(new Set());
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [liveMissingScan, setLiveMissingScan] = useState<TagScan | null>(null);
+  const [realtimeState, setRealtimeState] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
+  const petsRef = useRef<Pet[]>([]);
   const firstName = user.name?.trim().split(/\s+/)[0] || "friend";
+
+  useEffect(() => { petsRef.current = pets; }, [pets]);
+
+  useEffect(() => {
+    let active = true;
+    let closeSubscription: (() => Promise<void>) | undefined;
+    const unreadKey = `petsagram:unread-scans:${user.$id}`;
+    try {
+      const stored = JSON.parse(localStorage.getItem(unreadKey) || "[]");
+      if (Array.isArray(stored)) setUnreadScanIds(new Set(stored.filter((id): id is string => typeof id === "string")));
+    } catch { localStorage.removeItem(unreadKey); }
+
+    void listRecentScans().then((rows) => {
+      if (!active) return;
+      setRecentScans(rows);
+      return subscribeToScans((scan) => {
+        if (!active) return;
+        setRecentScans((current) => [scan, ...current.filter((item) => item.$id !== scan.$id)].slice(0, 50));
+        setUnreadScanIds((current) => {
+          const next = new Set(current).add(scan.$id);
+          localStorage.setItem(unreadKey, JSON.stringify([...next]));
+          return next;
+        });
+        const petId = relationId(scan.petId);
+        const pet = petsRef.current.find((item) => item.$id === petId);
+        if (scan.petStatusAtScan === "missing" || pet?.status === "missing") setLiveMissingScan(scan);
+      }, setRealtimeState);
+    }).then((close) => {
+      if (!close) return;
+      if (!active) void close(); else closeSubscription = close;
+    }).catch(() => { if (active) setRealtimeState("error"); });
+    return () => { active = false; void closeSubscription?.(); };
+  }, [user.$id]);
 
   useEffect(() => {
     listPets(user.$id)
@@ -77,6 +121,14 @@ export function Home({ user, onSignOut }: HomeProps) {
       .finally(() => { if (active) setIsLoadingScans(false); });
     return () => { active = false; };
   }, [selectedTag?.$id]);
+
+  useEffect(() => {
+    if (!selectedTag) return;
+    const matching = recentScans.filter((scan) => relationId(scan.tagId) === selectedTag.$id);
+    if (!matching.length) return;
+    setTagScans((current) => [...matching, ...current.filter((scan) => !matching.some((item) => item.$id === scan.$id))]
+      .sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()));
+  }, [recentScans, selectedTag?.$id]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -306,12 +358,33 @@ export function Home({ user, onSignOut }: HomeProps) {
     return pet.photoUrl ? [pet.photoUrl] : [];
   }
 
+  function markAllNotificationsRead() {
+    setUnreadScanIds(new Set());
+    localStorage.setItem(`petsagram:unread-scans:${user.$id}`, "[]");
+  }
+
+  const notificationBell = <button className="icon-button notification-bell" aria-label={`${unreadScanIds.size} unread notifications`} onClick={() => setIsNotificationsOpen(true)}><Bell />{unreadScanIds.size > 0 && <span>{Math.min(unreadScanIds.size, 99)}</span>}</button>;
+  const notificationUi = <NotificationCenter
+    scans={recentScans}
+    unreadIds={unreadScanIds}
+    isOpen={isNotificationsOpen}
+    liveScan={liveMissingScan}
+    connectionState={realtimeState}
+    pets={pets}
+    tags={tags}
+    onClose={() => setIsNotificationsOpen(false)}
+    onDismissLive={() => setLiveMissingScan(null)}
+    onMarkAllRead={markAllNotificationsRead}
+    onOpenPet={(pet) => { setLiveMissingScan(null); setIsNotificationsOpen(false); setSelectedTag(null); setSelectedVet(null); setSelectedPet(pet); }}
+    onOpenTag={(tag) => { setLiveMissingScan(null); setIsNotificationsOpen(false); setSelectedPet(null); setSelectedVet(null); setSelectedTag(tag); }}
+  />;
+
   if (isMapView) {
     const locatedTags = tags.filter((tag) => tag.location);
     const missingTags = locatedTags.filter((tag) => getTagPet(tag)?.status === "missing");
     return (
       <main className="home-page map-view-page">
-        <nav className="home-nav"><button className="details-back" onClick={() => setIsMapView(false)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <nav className="home-nav"><button className="details-back" onClick={() => setIsMapView(false)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a>{notificationBell}</nav>
         <div className="map-view-content">
           <header className="map-view-header"><div><p className="eyebrow">Location overview</p><h1>Locate your furry babies</h1><p>See every located QR tag and the pet connected to it.</p></div><div className="map-view-stats"><span><strong>{locatedTags.length}</strong> located</span><span className={missingTags.length ? "alert" : ""}><strong>{missingTags.length}</strong> missing</span></div></header>
           <section className="map-view-panel">
@@ -319,7 +392,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             {!locatedTags.length && <div className="map-view-empty"><MapPin /><h2>No tag locations yet</h2><p>Open a QR tag and set its location to make it appear here.</p></div>}
             <div className="map-view-legend"><span><i className="legend-photo" /> Located pet</span><span><i className="legend-missing">⚑</i> Missing pet</span></div>
           </section>
-        </div>
+        </div>{notificationUi}
       </main>
     );
   }
@@ -329,7 +402,7 @@ export function Home({ user, onSignOut }: HomeProps) {
     const vet = typeof selectedPet.vetContactId === "string" ? vetContacts.find((item) => item.$id === selectedPet.vetContactId) : selectedPet.vetContactId;
     return (
       <main className="home-page">
-        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedPet(null)}><ArrowLeft /> Back to pets</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedPet(null)}><ArrowLeft /> Back to pets</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a>{notificationBell}</nav>
         <div className="pet-details-page">
           <header className="pet-details-header"><div><p className="eyebrow">Pet profile</p><h1>{selectedPet.name}</h1><p>{[selectedPet.breed, selectedPet.color].filter(Boolean).join(" · ") || "A beloved member of the family"}</p></div><div className="pet-details-actions"><span className={`pet-status ${selectedPet.status}`}>{selectedPet.status}</span><Button variant="outline" onClick={() => { setEditingPet(selectedPet); setSelectedPet(null); }}><Pencil /> Edit pet</Button></div></header>
           <section className={`pet-gallery ${photos.length === 1 ? "single" : ""}`}>
@@ -339,8 +412,8 @@ export function Home({ user, onSignOut }: HomeProps) {
             <div className="pet-info-card"><h2>Pet details</h2><dl><div><dt>Breed</dt><dd>{selectedPet.breed || "Not provided"}</dd></div><div><dt>Color</dt><dd>{selectedPet.color || "Not provided"}</dd></div><div><dt>Birth date</dt><dd>{selectedPet.birthDate ? new Date(selectedPet.birthDate).toLocaleDateString() : "Not provided"}</dd></div><div><dt>Microchip ID</dt><dd>{selectedPet.microchipId || "Not provided"}</dd></div><div><dt>Public QR name</dt><dd>{showsNamePublicly(selectedPet) ? "Visible" : "Hidden"}</dd></div></dl></div>
             <div className="pet-info-card"><h2>Care & location</h2><dl><div><dt>Vet</dt><dd>{vet ? `${vet.name}${vet.clinic ? ` · ${vet.clinic}` : ""}` : "Not assigned"}</dd></div><div><dt>Vet phone</dt><dd>{vet?.phone || "Not provided"}</dd></div><div><dt>Last seen</dt><dd>{selectedPet.lastSeenAt ? new Date(selectedPet.lastSeenAt).toLocaleString() : "Not provided"}</dd></div><div><dt>Last known location</dt><dd>{selectedPet.lastKnownLocation ? <span className="location-value"><MapPin /> {selectedPet.lastKnownLocation[1]}, {selectedPet.lastKnownLocation[0]}</span> : "Not provided"}</dd></div><div><dt>Profile created</dt><dd>{new Date(selectedPet.$createdAt).toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{new Date(selectedPet.$updatedAt).toLocaleString()}</dd></div></dl></div>
           </section>
-          <PetQrActivity pet={selectedPet} tags={tags} owner={user} vet={vet} onSelectTag={(tag) => { setSelectedPet(null); setSelectedTag(tag); }} />
-        </div>
+          <PetQrActivity pet={selectedPet} tags={tags} owner={user} vet={vet} liveScans={recentScans} onSelectTag={(tag) => { setSelectedPet(null); setSelectedTag(tag); }} />
+        </div>{notificationUi}
       </main>
     );
   }
@@ -349,7 +422,7 @@ export function Home({ user, onSignOut }: HomeProps) {
     const assignedPets = pets.filter((pet) => getVetId(pet) === selectedVet.$id);
     return (
       <main className="home-page">
-        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedVet(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedVet(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a>{notificationBell}</nav>
         <div className="vet-details-page">
           <header className="vet-details-header">
             <span className="vet-details-avatar"><Stethoscope /></span>
@@ -360,7 +433,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             <div className="pet-info-card"><h2>Contact information</h2><dl><div><dt>Name</dt><dd>{selectedVet.name}</dd></div><div><dt>Clinic</dt><dd>{selectedVet.clinic || "Not provided"}</dd></div><div><dt>Phone</dt><dd><a className="detail-phone-link" href={`tel:${selectedVet.phone}`}>{selectedVet.phone}</a></dd></div><div><dt>Added</dt><dd>{new Date(selectedVet.$createdAt).toLocaleString()}</dd></div><div><dt>Last updated</dt><dd>{new Date(selectedVet.$updatedAt).toLocaleString()}</dd></div></dl></div>
             <div className="pet-info-card"><h2>Assigned pets</h2>{assignedPets.length ? <div className="assigned-pet-list">{assignedPets.map((pet) => <button key={pet.$id} onClick={() => { setSelectedVet(null); setSelectedPet(pet); }}>{pet.photoUrl ? <img src={pet.photoUrl} alt="" /> : <span><PawPrint /></span>}<div><strong>{pet.name}</strong><small>{[pet.breed, pet.color].filter(Boolean).join(" · ") || "Pet profile"}</small></div><ChevronRight /></button>)}</div> : <div className="empty-assignment"><PawPrint /><p>No pets are assigned to this vet yet.</p></div>}</div>
           </section>
-        </div>
+        </div>{notificationUi}
       </main>
     );
   }
@@ -373,7 +446,7 @@ export function Home({ user, onSignOut }: HomeProps) {
     const selectedScan = tagScans.find((scan) => scan.$id === selectedScanId);
     return (
       <main className="home-page">
-        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a></nav>
+        <nav className="home-nav"><button className="details-back" onClick={() => setSelectedTag(null)}><ArrowLeft /> Back to home</button><a className="brand home-brand" href="/"><span className="brand-mark"><PawPrint /></span><span>Pets Heaven</span></a>{notificationBell}</nav>
         <div className="tag-details-page">
           <section className={`tag-hero tag-${selectedTag.color}`}><div className="tag-qr"><QRCodeImage value={publicUrl} label={selectedTag.label} /></div><div><p className="eyebrow">Smart QR tag</p><h1>{selectedTag.label}</h1><p>{pet ? `Linked to ${pet.name}` : "Not assigned to a pet"}</p><span className={`tag-state ${selectedTag.isActive ? "active" : "inactive"}`}>{selectedTag.isActive ? "Active" : "Paused"}</span></div></section>
           {tagError && <p className="home-error" role="alert">{tagError}</p>}
@@ -393,7 +466,7 @@ export function Home({ user, onSignOut }: HomeProps) {
             <div className="scan-history-heading"><div><p className="eyebrow">QR activity</p><h2>Scan history</h2></div><span>{tagScans.length} {tagScans.length === 1 ? "scan" : "scans"}</span></div>
             {isLoadingScans ? <p className="scan-history-empty">Loading scan history…</p> : tagScans.length ? <div className="scan-history-layout"><div className="scan-history-list">{tagScans.map((scan) => <button key={scan.$id} className={selectedScanId === scan.$id ? "selected" : ""} onClick={() => setSelectedScanId(scan.$id)}><span className={scan.location ? "scan-location-state located" : "scan-location-state"}><MapPin /></span><span><strong>{new Date(scan.scannedAt).toLocaleString()}</strong><small>{scan.location ? `${scan.location[1].toFixed(5)}, ${scan.location[0].toFixed(5)}` : "Location permission not granted"}</small></span><ChevronRight /></button>)}</div><div className="scan-history-map">{selectedScan?.location ? <><ScanLocationMap location={selectedScan.location} pet={pet} owner={user} vet={vet} /><div className="scan-map-meta"><span><MapPin /> {selectedScan.location[1].toFixed(6)}, {selectedScan.location[0].toFixed(6)}</span><a href={`https://www.openstreetmap.org/?mlat=${selectedScan.location[1]}&mlon=${selectedScan.location[0]}#map=16/${selectedScan.location[1]}/${selectedScan.location[0]}`} target="_blank" rel="noreferrer">Open map <ExternalLink /></a></div></> : <div className="scan-map-empty"><MapPin /><p>Select a scan with a shared location to view it on the map.</p></div>}</div></div> : <p className="scan-history-empty">No scans have been recorded for this tag yet.</p>}
           </section>
-        </div>
+        </div>{notificationUi}
       </main>
     );
   }
@@ -405,7 +478,7 @@ export function Home({ user, onSignOut }: HomeProps) {
           <span className="brand-mark"><PawPrint aria-hidden="true" /></span><span>Pets Heaven</span>
         </a>
         <div className="nav-actions">
-          <button className="icon-button" aria-label="Notifications"><Bell /></button>
+          {notificationBell}
           <div className="user-chip"><span>{firstName.charAt(0).toUpperCase()}</span><div><strong>{user.name || "Pet parent"}</strong><small>{user.email}</small></div></div>
           <Button variant="ghost" onClick={handleSignOut} disabled={isSigningOut} className="signout-button">
             <LogOut /> {isSigningOut ? "Signing out…" : "Sign out"}
@@ -547,6 +620,7 @@ export function Home({ user, onSignOut }: HomeProps) {
       )}
 
       {isAddingTag && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsAddingTag(false); }}><section className="pet-modal" role="dialog" aria-modal="true" aria-labelledby="add-tag-title"><button className="modal-close" onClick={() => setIsAddingTag(false)} aria-label="Close"><X /></button><span className="modal-icon"><QrCode /></span><p className="eyebrow">Smart identification</p><h2 id="add-tag-title">Get a QR pet tag</h2><p>Choose a color and name. A unique, secure QR code is generated automatically.</p><form onSubmit={purchaseTag}><div className="field-group"><Label htmlFor="tagLabel">Tag name</Label><Input id="tagLabel" name="label" placeholder="Milo’s collar tag" maxLength={128} required autoFocus /></div><fieldset className="tag-color-picker"><legend>Tag color</legend>{TAG_COLORS.map((color) => <label key={color}><input type="radio" name="color" value={color} defaultChecked={color === "forest"} /><span className={`tag-color tag-${color}`} aria-hidden="true" /><span>{color}</span></label>)}</fieldset>{tagError && <p className="form-message" role="alert">{tagError}</p>}<div className="modal-actions"><Button type="button" variant="outline" onClick={() => setIsAddingTag(false)} disabled={isSavingTag}>Cancel</Button><Button type="submit" className="save-pet-button" disabled={isSavingTag}>{isSavingTag ? "Creating…" : "Create tag"}</Button></div></form></section></div>}
+      {notificationUi}
     </main>
   );
 }

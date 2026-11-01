@@ -14,6 +14,7 @@ type Props = {
   owner: AuthUser;
   vet?: VetContact | null;
   onSelectTag: (tag: QRTag) => void;
+  liveScans?: TagScan[];
 };
 
 function relationId(value: QRTag | Pet | string | null | undefined) {
@@ -24,7 +25,7 @@ function scanTagId(scan: TagScan) {
   return relationId(scan.tagId);
 }
 
-export function PetQrActivity({ pet, tags, owner, vet, onSelectTag }: Props) {
+export function PetQrActivity({ pet, tags, owner, vet, onSelectTag, liveScans = [] }: Props) {
   const associatedTags = useMemo(() => tags.filter((tag) => relationId(tag.petId) === pet.$id), [tags, pet.$id]);
   const [scans, setScans] = useState<TagScan[]>([]);
   const [total, setTotal] = useState(0);
@@ -53,6 +54,17 @@ export function PetQrActivity({ pet, tags, owner, vet, onSelectTag }: Props) {
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
   }, [pet.$id]);
+
+  useEffect(() => {
+    const matching = liveScans.filter((scan) => relationId(scan.petId) === pet.$id);
+    if (!matching.length) return;
+    setScans((current) => {
+      const merged = [...matching, ...current.filter((scan) => !matching.some((item) => item.$id === scan.$id))]
+        .sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
+      setTotal((count) => Math.max(count, merged.length));
+      return merged;
+    });
+  }, [liveScans, pet.$id]);
 
   const filteredScans = useMemo(() => selectedTagId === "all" ? scans : scans.filter((scan) => scanTagId(scan) === selectedTagId), [scans, selectedTagId]);
   const locatedScans = useMemo(() => filteredScans.filter((scan) => scan.location), [filteredScans]);

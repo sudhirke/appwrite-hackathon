@@ -2,6 +2,7 @@ import {
   AppwriteException,
   Client,
   Permission,
+  OrderBy,
   RelationMutate,
   RelationshipType,
   Role,
@@ -167,10 +168,12 @@ const definitions = [
     id: "scans",
     name: "Scans",
     columns: [
+      { key: "ownerId", type: "varchar", size: 36, required: true },
       { key: "location", type: "point", required: false },
       { key: "consentGiven", type: "boolean", required: true },
       { key: "ipHash", type: "varchar", size: 128, required: false },
       { key: "scannedAt", type: "datetime", required: true },
+      { key: "petStatusAtScan", type: "enum", elements: ["safe", "missing"], required: true },
     ],
     indexes: [
       {
@@ -179,6 +182,7 @@ const definitions = [
         attributes: ["scannedAt"],
         orders: ["DESC"],
       },
+      { key: "owner_scanned_idx", type: "key", attributes: ["ownerId", "scannedAt"], orders: ["ASC", "DESC"] },
     ],
   },
   {
@@ -332,6 +336,22 @@ const tagIndexes = await tables.listIndexes({ databaseId, tableId: "qr_tags" });
 if (!tagIndexes.indexes.some((index) => index.key === "owner_idx")) {
   await tables.createIndex({ databaseId, tableId: "qr_tags", key: "owner_idx", type: TablesDBIndexType.Key, columns: ["ownerId"] });
   console.log("created index qr_tags.owner_idx");
+}
+
+const scanColumns = await tables.listColumns({ databaseId, tableId: "scans" });
+if (!scanColumns.columns.some((column) => column.key === "ownerId")) {
+  await tables.createVarcharColumn({ databaseId, tableId: "scans", key: "ownerId", size: 36, required: false });
+  console.log("created column scans.ownerId");
+}
+if (!scanColumns.columns.some((column) => column.key === "petStatusAtScan")) {
+  await tables.createEnumColumn({ databaseId, tableId: "scans", key: "petStatusAtScan", elements: ["safe", "missing"], required: false });
+  console.log("created column scans.petStatusAtScan");
+}
+
+const scanIndexes = await tables.listIndexes({ databaseId, tableId: "scans" });
+if (!scanIndexes.indexes.some((index) => index.key === "owner_scanned_idx")) {
+  await tables.createIndex({ databaseId, tableId: "scans", key: "owner_scanned_idx", type: TablesDBIndexType.Key, columns: ["ownerId", "scannedAt"], orders: [OrderBy.Asc, OrderBy.Desc] });
+  console.log("created index scans.owner_scanned_idx");
 }
 
 for (const relationship of relationships) {
